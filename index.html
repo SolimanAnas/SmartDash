@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#A30C24" />
+<title>[ORG] Airport Operations Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --red:#C8102E;--red-d:#A30C24;--red-soft:#FCEAEC;
+    --ink:#15202B;--ink2:#3D4856;--muted:#7C8795;--line:#E6E9EE;
+    --bg:#F4F6F9;--surface:#FFFFFF;--surface-2:#FAFBFC;
+    --day:#B5790A;--day-soft:#FBEFD6;--night:#3B4DA6;--night-soft:#E7EAF8;
+    --off:#8A93A0;--off-soft:#EEF0F4;--leave:#0E8074;--leave-soft:#DBF1EE;
+    --green:#1E7A46;--green-soft:#E6F2EA;--amber:#B5790A;--amber-soft:#FBF1DC;
+    --blue:#2A5C9A;--blue-soft:#E8EFF8;--gold:#A9772A;--gold-soft:#F6EFDF;
+    --orange:#C2410C;--orange-soft:#FBEADF;
+    --shadow:0 1px 2px rgba(20,28,46,.04),0 6px 18px rgba(20,28,46,.06);
+    --shadow-lg:0 12px 44px rgba(20,28,46,.20);
+    --r:16px;--nav-h:64px;
+    --f-disp:'Sora',sans-serif;--f-body:'IBM Plex Sans',sans-serif;--f-mono:'IBM Plex Mono',monospace;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{font-family:var(--f-body);background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;line-height:1.5;
+    padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom));min-height:100vh;}
+  h1,h2,h3,h4{font-family:var(--f-disp);margin:0;line-height:1.2;letter-spacing:-.01em;}
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
+  input,select,textarea{font-family:inherit;font-size:15px;}
+  .mono{font-family:var(--f-mono);} a{color:var(--red-d);text-decoration:none;}
+
+  .topbar{position:sticky;top:0;z-index:40;background:var(--surface);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top);}
+  .strip{height:4px;background:linear-gradient(90deg,var(--red),var(--red-d));}
+  .tb-inner{display:flex;align-items:center;gap:12px;padding:11px 16px;}
+  .logo{width:42px;height:42px;border-radius:12px;flex:0 0 auto;background:linear-gradient(150deg,var(--red),var(--red-d));display:grid;place-items:center;box-shadow:0 4px 12px rgba(176,16,48,.28);}
+  .logo svg{width:24px;height:24px;}
+  .tb-titles{flex:1;min-width:0;}
+  .tb-titles h1{font-size:16px;font-weight:800;}
+  .tb-titles p{margin:1px 0 0;font-size:10.5px;color:var(--muted);font-weight:500;letter-spacing:.02em;text-transform:uppercase;}
+  .iconbtn{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;color:var(--ink2);transition:.15s;}
+  .iconbtn:active{background:var(--off-soft);} .iconbtn svg{width:21px;height:21px;}
+
+  .daysel{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--ink);color:#fff;border-radius:14px;padding:9px 12px;margin-bottom:16px;box-shadow:var(--shadow);}
+  .daysel .nav-d{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:rgba(255,255,255,.12);transition:.15s;}
+  .daysel .nav-d:active{background:rgba(255,255,255,.25);} .daysel .nav-d svg{width:18px;height:18px;}
+  .daysel .center .d{font-family:var(--f-disp);font-weight:700;font-size:16px;text-align:center;}
+  .daysel .center .wd{font-size:10.5px;opacity:.7;font-weight:500;letter-spacing:.04em;text-transform:uppercase;text-align:center;}
+  .daysel .today-b{font-size:11px;font-weight:600;background:var(--red);padding:5px 10px;border-radius:8px;opacity:0;pointer-events:none;transition:.15s;}
+  .daysel .today-b.show{opacity:1;pointer-events:auto;}
+
+  .view{display:none;padding:16px 16px 26px;max-width:760px;margin:0 auto;}
+  .view.active{display:block;animation:fade .28s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+  .sec-h{display:flex;align-items:baseline;justify-content:space-between;margin:2px 2px 13px;}
+  .sec-h h2{font-size:20px;font-weight:800;} .sec-h .sub{font-size:12px;color:var(--muted);font-weight:500;}
+  .back{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;color:var(--muted);margin:0 0 12px;}
+  .back svg{width:16px;height:16px;}
+
+  /* live status band */
+  .liveband{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border-radius:16px;overflow:hidden;margin-bottom:16px;box-shadow:var(--shadow);}
+  .live{background:linear-gradient(160deg,#1b2735,#15202B);color:#fff;padding:15px 10px;text-align:center;}
+  .live .n{font-family:var(--f-disp);font-weight:800;font-size:24px;line-height:1;}
+  .live .l{font-size:9.5px;opacity:.7;margin-top:6px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
+  .live .n.good{color:#5BD6A0;} .live .n.warn{color:#FFB454;} .live .n.bad{color:#FF7A85;}
+  .livedot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#5BD6A0;margin-right:5px;animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+  .kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:16px;}
+  .kpi{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:var(--shadow);position:relative;overflow:hidden;}
+  .kpi .ic{position:absolute;top:13px;right:13px;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;}
+  .kpi .ic svg{width:16px;height:16px;}
+  .kpi .n{font-family:var(--f-disp);font-weight:800;font-size:26px;line-height:1;}
+  .kpi .n small{font-size:13px;font-weight:600;color:var(--muted);}
+  .kpi .l{font-size:11px;color:var(--muted);margin-top:6px;font-weight:600;}
+  .kpi .trend{font-size:11px;font-weight:600;margin-top:7px;display:flex;align-items:center;gap:4px;}
+  .up{color:var(--green);} .down{color:var(--red);}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:16px;margin-bottom:14px;}
+  .card-h{font-family:var(--f-disp);font-size:13px;font-weight:700;color:var(--ink2);margin-bottom:13px;text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;gap:8px;}
+  .card-h svg{width:16px;height:16px;color:var(--muted);}
+  .card-h .more-l{margin-left:auto;font-family:var(--f-body);font-size:11px;color:var(--red-d);font-weight:600;text-transform:none;letter-spacing:0;}
+
+  /* coverage rows */
+  .cov-row{display:flex;align-items:center;gap:12px;padding:13px 0;border-top:1px solid var(--line);cursor:pointer;}
+  .cov-row:first-child{border-top:none;}
+  .cov-name{flex:1;min-width:0;} .cov-name .t{font-size:14.5px;font-weight:700;} .cov-name .s{font-size:11.5px;color:var(--muted);margin-top:2px;}
+  .cov-var{font-family:var(--f-mono);font-weight:600;font-size:13px;}
+  .status-pill{font-size:11px;font-weight:700;padding:5px 11px;border-radius:20px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;}
+  .status-pill .d{width:7px;height:7px;border-radius:50%;}
+  .sp-ok{background:var(--green-soft);color:var(--green);} .sp-ok .d{background:var(--green);}
+  .sp-short{background:var(--amber-soft);color:var(--amber);} .sp-short .d{background:var(--amber);}
+  .sp-crit{background:var(--red-soft);color:var(--red-d);} .sp-crit .d{background:var(--red);}
+
+  /* terminal map */
+  .map{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:2px;}
+  .zone{border-radius:14px;padding:15px;color:#fff;position:relative;overflow:hidden;cursor:pointer;min-height:96px;display:flex;flex-direction:column;justify-content:space-between;transition:.15s;}
+  .zone:active{transform:scale(.98);}
+  .zone .zt{font-family:var(--f-disp);font-weight:700;font-size:15px;}
+  .zone .zs{font-size:11px;opacity:.85;margin-top:2px;}
+  .zone .zmeta{font-family:var(--f-mono);font-size:12px;font-weight:600;}
+  .zone .zbadge{align-self:flex-start;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:rgba(255,255,255,.22);}
+  .z-ok{background:linear-gradient(150deg,#1E8E57,#16683f);} .z-short{background:linear-gradient(150deg,#C9881A,#9c690f);} .z-crit{background:linear-gradient(150deg,#C8102E,#92091f);}
+
+  /* charts */
+  .chart{width:100%;}
+  .chart text{font-family:var(--f-mono);fill:var(--muted);font-size:9px;}
+  .chart .axis{stroke:var(--line);stroke-width:1;}
+  .bar{fill:var(--red);} .bar2{fill:var(--night);}
+  .spark{stroke:var(--red);stroke-width:2;fill:none;}
+  .sparkfill{fill:var(--red-soft);opacity:.6;}
+
+  /* search/chips */
+  .searchbar{display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:0 13px;height:46px;margin-bottom:12px;box-shadow:var(--shadow);}
+  .searchbar svg{width:19px;height:19px;color:var(--muted);flex:0 0 auto;} .searchbar input{flex:1;border:none;outline:none;background:none;font-size:15px;}
+  .searchbar input::placeholder{color:var(--muted);}
+  .chips{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 12px;scrollbar-width:none;} .chips::-webkit-scrollbar{display:none;}
+  .chip{flex:0 0 auto;padding:7px 14px;border-radius:20px;background:var(--surface);border:1px solid var(--line);font-size:13px;font-weight:600;color:var(--ink2);white-space:nowrap;transition:.15s;}
+  .chip.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+
+  .grp-h{font-family:var(--f-disp);font-weight:700;font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:18px 4px 9px;display:flex;align-items:center;gap:8px;}
+  .grp-h:first-child{margin-top:2px;} .grp-h .tag-ap{font-family:var(--f-mono);font-size:10px;background:var(--ink);color:#fff;padding:2px 7px;border-radius:6px;}
+
+  .rec{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:11px;box-shadow:var(--shadow);transition:.15s;animation:rise .3s ease both;}
+  .rec:active{transform:scale(.992);} @keyframes rise{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+  .rec-top{display:flex;align-items:center;gap:11px;}
+  .callsign{font-family:var(--f-mono);font-weight:600;font-size:12.5px;background:var(--red-soft);color:var(--red-d);padding:5px 9px;border-radius:8px;white-space:nowrap;flex:0 0 auto;}
+  .rec-main{flex:1;min-width:0;} .rec-main .t{font-size:14.5px;font-weight:700;} .rec-main .m{font-size:12px;color:var(--muted);margin-top:2px;}
+  .crewline{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px;align-items:center;}
+  .crew-pill{display:flex;align-items:center;gap:6px;font-size:12px;background:var(--surface-2);border:1px solid var(--line);padding:4px 9px 4px 5px;border-radius:20px;}
+  .tdot{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-family:var(--f-mono);font-size:9px;font-weight:600;color:#fff;}
+  .tdot.A{background:var(--red);} .tdot.B{background:var(--night);} .tdot.C{background:var(--gold);} .tdot.D{background:var(--green);}
+
+  .staff-row{display:flex;align-items:center;gap:12px;}
+  .avatar{width:40px;height:40px;border-radius:11px;flex:0 0 auto;display:grid;place-items:center;font-family:var(--f-disp);font-weight:700;font-size:14px;background:var(--off-soft);color:var(--ink2);}
+  .staff-row .info{flex:1;min-width:0;} .staff-row .info .nm{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .staff-row .info .sub{font-size:12px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .scode{font-family:var(--f-mono);font-weight:600;font-size:12px;padding:4px 8px;border-radius:7px;flex:0 0 auto;}
+  .sc-D{background:var(--day-soft);color:var(--day);} .sc-N{background:var(--night-soft);color:var(--night);}
+  .sc-X{background:var(--off-soft);color:var(--off);} .sc-AL{background:var(--leave-soft);color:var(--leave);}
+  .tag{font-size:11px;font-weight:600;padding:3px 8px;border-radius:6px;background:var(--off-soft);color:var(--ink2);}
+  .tag.sic{background:var(--red-soft);color:var(--red-d);} .tag.ema{background:var(--blue-soft);color:var(--blue);}
+  .tag.teamA{background:var(--red-soft);color:var(--red-d);} .tag.teamB{background:var(--night-soft);color:var(--night);}
+  .tag.teamC{background:var(--gold-soft);color:var(--gold);} .tag.teamD{background:var(--green-soft);color:var(--green);}
+
+  /* priority/status */
+  .pri{font-size:11px;font-weight:700;padding:4px 9px;border-radius:7px;}
+  .pri-Critical{background:var(--red-soft);color:var(--red-d);} .pri-High{background:var(--orange-soft);color:var(--orange);}
+  .pri-Medium{background:var(--amber-soft);color:var(--amber);} .pri-Low{background:var(--off-soft);color:var(--off);}
+  .st{font-size:11px;font-weight:700;padding:4px 9px;border-radius:7px;}
+  .st-open{background:var(--red-soft);color:var(--red-d);} .st-prog{background:var(--amber-soft);color:var(--amber);} .st-res{background:var(--green-soft);color:var(--green);}
+
+  .legend{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:14px;}
+  .legend span{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink2);font-weight:500;}
+  .lg-dot{width:13px;height:13px;border-radius:4px;}
+  .strip-wrap{overflow-x:auto;scrollbar-width:none;padding-bottom:4px;} .strip-wrap::-webkit-scrollbar{display:none;}
+  .strip-row{display:flex;align-items:center;gap:5px;margin-bottom:8px;}
+  .strip-row .rl{flex:0 0 50px;font-family:var(--f-disp);font-weight:700;font-size:12px;color:var(--ink2);display:flex;align-items:center;gap:6px;}
+  .cell{flex:0 0 auto;width:28px;height:36px;border-radius:7px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--f-mono);cursor:pointer;border:2px solid transparent;}
+  .cell .cd{font-size:8px;opacity:.6;} .cell .cc{font-size:10.5px;font-weight:600;}
+  .cell.sel{border-color:var(--ink);}
+  .cell.c-D{background:var(--day-soft);color:var(--day);} .cell.c-N{background:var(--night-soft);color:var(--night);}
+  .cell.c-X{background:var(--off-soft);color:var(--off);} .cell.c-AL{background:var(--leave-soft);color:var(--leave);}
+  .minical{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:6px;}
+  .mc{border-radius:8px;height:38px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--f-mono);}
+  .mc .d{font-size:9px;opacity:.6;} .mc .c{font-size:11px;font-weight:600;}
+  .mc.c-D{background:var(--day-soft);color:var(--day);} .mc.c-N{background:var(--night-soft);color:var(--night);}
+  .mc.c-X{background:var(--off-soft);color:var(--off);} .mc.c-AL{background:var(--leave-soft);color:var(--leave);}
+  .mc.today{outline:2px solid var(--ink);outline-offset:-2px;}
+
+  .empty{text-align:center;padding:42px 24px;color:var(--muted);} .empty svg{width:46px;height:46px;opacity:.3;margin-bottom:12px;} .empty p{font-size:14px;margin:0;font-weight:500;}
+
+  .menu-item{display:flex;align-items:center;gap:13px;padding:15px;background:var(--surface);border:1px solid var(--line);border-radius:13px;margin-bottom:11px;box-shadow:var(--shadow);width:100%;text-align:left;transition:.15s;}
+  .menu-item:active{background:var(--surface-2);} .menu-item .mi-ic{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;flex:0 0 auto;} .menu-item .mi-ic svg{width:19px;height:19px;}
+  .menu-item .mi-t{font-size:14.5px;font-weight:700;} .menu-item .mi-d{font-size:12px;color:var(--muted);margin-top:1px;} .menu-item .chev{margin-left:auto;color:var(--muted);}
+  .menu-label{font-family:var(--f-disp);font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:16px 4px 9px;}
+
+  .drop{border:2px dashed var(--line);border-radius:14px;padding:22px 16px;text-align:center;background:var(--surface-2);transition:.15s;margin-bottom:11px;cursor:pointer;}
+  .drop.over{border-color:var(--red);background:var(--red-soft);}
+  .drop .di{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;margin:0 auto 10px;}
+  .drop .di svg{width:21px;height:21px;} .drop .dt{font-size:14px;font-weight:700;} .drop .dd{font-size:12px;color:var(--muted);margin-top:3px;}
+  .drop .tpl{display:inline-block;margin-top:9px;font-size:12px;font-weight:600;color:var(--red-d);}
+
+  .road{background:linear-gradient(160deg,#1b2735,#15202B);color:#fff;border-radius:16px;padding:18px;margin-bottom:14px;}
+  .road h3{font-size:15px;font-weight:700;margin-bottom:4px;}
+  .road p{font-size:12px;opacity:.75;margin:0 0 14px;}
+  .road-item{display:flex;align-items:center;gap:11px;padding:10px 0;border-top:1px solid rgba(255,255,255,.1);}
+  .road-item:first-of-type{border-top:none;} .road-item .ri{width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,.1);display:grid;place-items:center;flex:0 0 auto;}
+  .road-item .ri svg{width:16px;height:16px;} .road-item .rt{font-size:13.5px;font-weight:600;flex:1;} .road-item .rb{font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;background:rgba(255,255,255,.14);opacity:.9;}
+
+  .fab{position:fixed;inset-inline-end:18px;bottom:calc(var(--nav-h) + 16px + env(safe-area-inset-bottom));width:54px;height:54px;border-radius:17px;z-index:45;background:linear-gradient(150deg,var(--red),var(--red-d));color:#fff;display:none;place-items:center;box-shadow:0 8px 22px rgba(176,16,48,.42);transition:.18s;}
+  .fab.show{display:grid;} .fab:active{transform:scale(.92);} .fab svg{width:25px;height:25px;}
+  .nav{position:fixed;bottom:0;inset-inline:0;z-index:42;background:var(--surface);border-top:1px solid var(--line);display:flex;height:var(--nav-h);padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -2px 14px rgba(20,28,46,.05);}
+  .nav button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--muted);font-family:var(--f-disp);font-size:9.5px;font-weight:600;transition:.15s;}
+  .nav button svg{width:21px;height:21px;} .nav button.active{color:var(--red);}
+
+  .scrim{position:fixed;inset:0;z-index:50;background:rgba(20,28,46,.5);opacity:0;pointer-events:none;transition:.25s;backdrop-filter:blur(2px);}
+  .scrim.open{opacity:1;pointer-events:auto;}
+  .sheet{position:fixed;inset-inline:0;bottom:0;z-index:51;background:var(--surface);border-radius:22px 22px 0 0;max-height:92vh;overflow-y:auto;transform:translateY(102%);transition:transform .3s cubic-bezier(.2,.8,.2,1);padding-bottom:calc(20px + env(safe-area-inset-bottom));box-shadow:var(--shadow-lg);}
+  .sheet.open{transform:none;}
+  .grab{width:40px;height:4px;border-radius:4px;background:#D6DAE2;margin:10px auto 4px;}
+  .sheet-head{display:flex;align-items:center;justify-content:space-between;padding:8px 18px 14px;position:sticky;top:0;background:var(--surface);z-index:2;border-bottom:1px solid var(--line);}
+  .sheet-head h3{font-size:17px;font-weight:800;} .sheet-body{padding:18px;}
+  .det-row{padding:12px 0;border-top:1px solid var(--line);} .det-row:first-child{border-top:none;}
+  .det-row .k{font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em;} .det-row .v{font-size:14.5px;line-height:1.55;}
+  .field{margin-bottom:14px;} .field label{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:6px;}
+  .field input,.field select,.field textarea{width:100%;padding:12px 13px;border:1px solid var(--line);border-radius:11px;background:var(--surface-2);outline:none;transition:.15s;}
+  .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--red);background:#fff;box-shadow:0 0 0 3px var(--red-soft);}
+  .field textarea{resize:vertical;min-height:78px;} .field-row{display:flex;gap:11px;} .field-row .field{flex:1;}
+  .btn{width:100%;padding:14px;border-radius:13px;font-family:var(--f-disp);font-weight:700;font-size:15px;transition:.15s;}
+  .btn-primary{background:var(--red);color:#fff;box-shadow:0 4px 14px rgba(176,16,48,.3);} .btn-primary:active{background:var(--red-d);}
+  .btn-ghost{background:var(--off-soft);color:var(--ink2);} .btn-danger{background:#fff;color:var(--red);border:1px solid #F0D2D8;}
+  .btn-row{display:flex;gap:10px;margin-top:6px;} .btn-row .btn{flex:1;}
+  .callbtn{display:inline-flex;align-items:center;gap:7px;font-family:var(--f-mono);font-weight:600;font-size:14px;color:var(--red-d);} .callbtn svg{width:16px;height:16px;}
+  .toast{position:fixed;bottom:calc(var(--nav-h) + 24px + env(safe-area-inset-bottom));inset-inline:0;margin:0 auto;width:max-content;max-width:88%;z-index:60;background:var(--ink);color:#fff;padding:12px 20px;border-radius:13px;font-size:13.5px;font-weight:600;box-shadow:var(--shadow-lg);opacity:0;transform:translateY(14px);transition:.28s;pointer-events:none;}
+  .toast.show{opacity:1;transform:none;} .req{color:var(--red);}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="strip"></div>
+  <div class="tb-inner">
+    <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-5 4 12 2-7h6"/></svg></div>
+    <div class="tb-titles"><h1>Airport Operations</h1><p>[ORGANIZATION NAME]</p></div>
+    <button class="iconbtn" onclick="go('more')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>
+  </div>
+</header>
+
+<!-- DASHBOARD -->
+<main id="view-dashboard" class="view active">
+  <div class="daysel">
+    <button class="nav-d" onclick="stepDay(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <div class="center"><div class="d" id="dsDate"></div><div class="wd" id="dsWd"></div></div>
+    <button class="today-b" id="dsToday" onclick="setDay(TODAY)">Today</button>
+    <button class="nav-d" onclick="stepDay(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg></button>
+  </div>
+  <div class="liveband" id="liveband"></div>
+  <div class="sec-h"><h2 style="font-size:16px">Management overview</h2><span class="sub" id="repMonthLbl"></span></div>
+  <div class="kpi-grid" id="mgmtKpis"></div>
+  <div class="card"><div class="card-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>Response time trend<span class="more-l" onclick="go('analytics')">Analytics →</span></div><div id="dashSpark"></div></div>
+  <div class="card"><div class="card-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Coverage now<span class="more-l" onclick="go('command')">Command Center →</span></div><div id="dashCoverage"></div></div>
+</main>
+
+<!-- COMMAND CENTER -->
+<main id="view-command" class="view">
+  <div class="sec-h"><h2>Command Center</h2><span class="sub" id="cmdDayLbl"></span></div>
+  <div class="daysel">
+    <button class="nav-d" onclick="stepDay(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <div class="center"><div class="d" id="cmdDate"></div><div class="wd" id="cmdWd"></div></div>
+    <button class="today-b" id="cmdToday" onclick="setDay(TODAY)">Today</button>
+    <button class="nav-d" onclick="stepDay(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg></button>
+  </div>
+  <div class="card"><div class="card-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Terminal status map</div><div class="map" id="termMap"></div></div>
+  <div class="card"><div class="card-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Coverage by terminal</div><div id="cmdCoverage"></div></div>
+</main>
+
+<!-- ROSTER -->
+<main id="view-roster" class="view">
+  <div class="sec-h"><h2>Roster</h2><span class="sub" id="rosMonth"></span></div>
+  <div class="legend">
+    <span><i class="lg-dot" style="background:var(--day)"></i>Day</span><span><i class="lg-dot" style="background:var(--night)"></i>Night</span>
+    <span><i class="lg-dot" style="background:var(--off)"></i>Off</span><span><i class="lg-dot" style="background:var(--leave)"></i>Leave</span>
+  </div>
+  <div class="card"><div class="card-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg>Team rotation — 4 platoons</div>
+    <div class="strip-wrap" id="strips"></div>
+    <p style="font-size:11.5px;color:var(--muted);margin:12px 2px 0;">Tap any day to inspect coverage. Teams A · B · C · D rotate Day / Night / Off.</p></div>
+  <div class="card"><div class="card-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>On duty — <span id="rosDay" style="text-transform:none;margin-left:4px"></span></div><div id="rosDuty"></div></div>
+</main>
+
+<!-- CHALLENGES -->
+<main id="view-challenges" class="view">
+  <div class="sec-h"><h2>Challenges</h2><span class="sub" id="chCount"></span></div>
+  <div class="kpi-grid" id="chStats" style="grid-template-columns:repeat(3,1fr)"></div>
+  <div class="searchbar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input id="chSearch" placeholder="Search challenges…" oninput="renderChallenges()"></div>
+  <div class="chips" id="chChips"></div>
+  <div id="chList"></div>
+</main>
+
+<!-- MORE -->
+<main id="view-more" class="view">
+  <div class="sec-h"><h2>More</h2></div>
+  <div class="menu-label">Operations</div>
+  <button class="menu-item" onclick="go('staff')"><div class="mi-ic" style="background:var(--blue-soft);color:var(--blue)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg></div><div><div class="mi-t">Staff Directory</div><div class="mi-d"><span id="menuStaffCount">Staff profiles & portfolios</span></div></div><span class="chev">›</span></button>
+  <button class="menu-item" onclick="go('reports')"><div class="mi-ic" style="background:var(--green-soft);color:var(--green)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h8"/></svg></div><div><div class="mi-t">Monthly Reports</div><div class="mi-d">Cases, response time, ROSC</div></div><span class="chev">›</span></button>
+  <button class="menu-item" onclick="go('analytics')"><div class="mi-ic" style="background:var(--red-soft);color:var(--red-d)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></div><div><div class="mi-t">Analytics</div><div class="mi-d">KPI trends & distributions</div></div><span class="chev">›</span></button>
+  <div class="menu-label">Records</div>
+  <button class="menu-item" onclick="go('achievements')"><div class="mi-ic" style="background:var(--gold-soft);color:var(--gold)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M8.2 12.5 7 22l5-3 5 3-1.2-9.5"/></svg></div><div><div class="mi-t">Achievements</div><div class="mi-d">Recognition & commendations</div></div><span class="chev">›</span></button>
+  <button class="menu-item" onclick="go('initiatives')"><div class="mi-ic" style="background:var(--night-soft);color:var(--night)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div><div><div class="mi-t">Initiatives</div><div class="mi-d">Digital transformation projects</div></div><span class="chev">›</span></button>
+  <div class="menu-label">Admin</div>
+  <button class="menu-item" onclick="go('upload')"><div class="mi-ic" style="background:var(--amber-soft);color:var(--amber)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/></svg></div><div><div class="mi-t">Upload Center</div><div class="mi-d">Excel import — roster, reports</div></div><span class="chev">›</span></button>
+  <button class="menu-item" onclick="go('settings')"><div class="mi-ic" style="background:var(--off-soft);color:var(--ink2)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 0 1-4 0v-.1A1.6 1.6 0 0 0 7 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H1a2 2 0 0 1 0-4h.1A1.6 1.6 0 0 0 4.6 7a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 2.7-1.1V1a2 2 0 0 1 4 0v.1A1.6 1.6 0 0 0 17 4.6a1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.7H23a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg></div><div><div class="mi-t">Settings & Roadmap</div><div class="mi-d">Backup · future enhancements</div></div><span class="chev">›</span></button>
+</main>
+
+<!-- STAFF -->
+<main id="view-staff" class="view">
+  <button class="back" onclick="go('more')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>More</button>
+  <div class="sec-h"><h2>Staff Directory</h2><span class="sub" id="stfCount"></span></div>
+  <div class="searchbar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input id="stfSearch" placeholder="Search name, ID, station, phone…" oninput="renderStaff()"></div>
+  <div class="chips" id="stfChips"></div>
+  <div id="stfList"></div>
+</main>
+
+<!-- REPORTS -->
+<main id="view-reports" class="view">
+  <button class="back" onclick="go('more')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>More</button>
+  <div class="sec-h"><h2>Monthly Reports</h2><span class="sub" id="repCount"></span></div>
+  <div class="btn-row" style="margin-bottom:14px"><button class="btn btn-ghost" onclick="go('upload')">Upload Excel</button><button class="btn btn-primary" onclick="editReport(null)">Add manually</button></div>
+  <div id="repList"></div>
+</main>
+
+<!-- ANALYTICS -->
+<main id="view-analytics" class="view">
+  <button class="back" onclick="go('more')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>More</button>
+  <div class="sec-h"><h2>Analytics</h2></div>
+  <div id="analytics"></div>
+</main>
+
+<!-- ACHIEVEMENTS -->
+<main id="view-achievements" class="view">
+  <button class="back" onclick="go('more')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>More</button>
+  <div class="sec-h"><h2>Achievements</h2><span class="sub" id="achCount"></span></div>
+  <div class="searchbar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input id="achSearch" placeholder="Search name or achievement…" oninput="renderAch()"></div>
+  <div class="chips" id="achChips"></div><div id="achList"></div>
+</main>
+
+<!-- INITIATIVES -->
+<main id="view-initiatives" class="view">
+  <button class="back" onclick="go('more')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>More</button>
+  <div class="sec-h"><h2>Initiatives</h2><span class="sub" id="initCount"></span></div>
+  <div class="searchbar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input id="initSearch" placeholder="Search initiatives…" oninput="renderInit()"></div>
+  <div class="chips" id="initChips"></div><div id="initList"></div>
+</main>
+
+<!-- UPLOAD -->
+<main id="view-upload" class="view">
+  <button class="back" onclick="go('more')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>More</button>
+  <div class="sec-h"><h2>Upload Center</h2></div>
+  <p style="font-size:13px;color:var(--ink2);margin:0 2px 14px;line-height:1.6">Drop an Excel file or tap a card. Everything stays on this device. Need the format? Download a template first.</p>
+  <div id="dropRoster" class="drop"></div>
+  <div id="dropReport" class="drop"></div>
+  <div id="dropAch" class="drop"></div>
+  <input type="file" id="fileIn" accept=".xlsx,.xls" style="display:none">
+</main>
+
+<!-- SETTINGS -->
+<main id="view-settings" class="view">
+  <button class="back" onclick="go('more')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>More</button>
+  <div class="sec-h"><h2>Settings</h2></div>
+  <div class="menu-label">Data</div>
+  <button class="menu-item" onclick="exportAllExcel()"><div class="mi-ic" style="background:var(--green-soft);color:var(--green)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></div><div><div class="mi-t">Export everything (Excel)</div><div class="mi-d">Challenges · reports · records</div></div></button>
+  <button class="menu-item" onclick="resetSample()"><div class="mi-ic" style="background:var(--amber-soft);color:var(--amber)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"/></svg></div><div><div class="mi-t">Reset sample data</div><div class="mi-d">Reload demo reports & challenges</div></div></button>
+  <button class="menu-item" onclick="clearAll()"><div class="mi-ic" style="background:var(--red-soft);color:var(--red-d)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></div><div><div class="mi-t">Clear all records</div><div class="mi-d">Cannot be undone</div></div></button>
+  <div class="menu-label">Future enhancements</div>
+  <div class="road">
+    <h3>Digital transformation roadmap</h3><p>Planned integrations beyond this platform.</p>
+    <div class="road-item"><div class="ri"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></div><div class="rt">Power BI integration</div><div class="rb">Phase 2</div></div>
+    <div class="road-item"><div class="ri"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4 4 4 0 0 1 0 8 4 4 0 0 1-8 0 4 4 0 0 1 0-8 4 4 0 0 1 4-4z"/></svg></div><div class="rt">Microsoft Copilot</div><div class="rb">Phase 3</div></div>
+    <div class="road-item"><div class="ri"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 20v-6M6 20v-3M18 20v-9M4 4l16 6"/></svg></div><div class="rt">Predictive analytics</div><div class="rb">Phase 3</div></div>
+    <div class="road-item"><div class="ri"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M4 9h16M9 9v11"/></svg></div><div class="rt">Automated reporting</div><div class="rb">Phase 2</div></div>
+  </div>
+  <p style="font-size:11.5px;color:var(--muted);text-align:center;line-height:1.7">Roster source: Airport schedule — June 2026 (Teams A–D). Excel engine: <span id="xlsxState" class="mono"></span></p>
+</main>
+
+<button class="fab" id="fab" onclick="onFab()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+
+<nav class="nav">
+  <button class="active" data-v="dashboard" onclick="go('dashboard')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13h8V3H3zM13 21h8V11h-8zM13 3v6h8V3zM3 21h8v-6H3z"/></svg><span>Dashboard</span></button>
+  <button data-v="command" onclick="go('command')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span>Command</span></button>
+  <button data-v="roster" onclick="go('roster')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg><span>Roster</span></button>
+  <button data-v="challenges" onclick="go('challenges')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg><span>Challenges</span></button>
+  <button data-v="more" onclick="go('more')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg><span>More</span></button>
+</nav>
+
+<div class="scrim" id="scrim" onclick="closeSheet()"></div>
+<div class="sheet" id="sheet"><div class="grab"></div><div class="sheet-head"><h3 id="sheetTitle"></h3><button class="iconbtn" onclick="closeSheet()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div><div class="sheet-body" id="sheetBody"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const ROSTER = {
+  "month": "June 2026", 
+  "year": 2026, 
+  "monthIndex": 5, 
+  "days": 30, 
+  "teams": ["A", "B", "C", "D"], 
+  "staff": [
+    { team: "A", airport: "AP1", terminal: "Terminal 1", area: "Zone A", callsign: "STATION 1", stationNo: "10", title: "EMT", id: "1001", name: "Staff Member A1", phone: "000 0000001", adp: true, tdp: true, shifts: ["N", "X", "X", "X", "X", "D", "D", "N", "N", "X", "X", "X", "X", "D", "D", "N", "N", "X", "X", "X", "X", "D", "D", "N", "N", "X", "X", "X", "X", "D"], remark: "" },
+    { team: "A", airport: "AP1", terminal: "Terminal 2", area: "Zone B", callsign: "STATION 2", stationNo: "20", title: "EMT", id: "1002", name: "Staff Member A2", phone: "000 0000002", adp: false, tdp: true, shifts: ["N", "X", "X", "X", "X", "D", "D", "N", "N", "X", "X", "X", "X", "D", "D", "N", "N", "X", "X", "X", "X", "D", "D", "N", "N", "X", "X", "X", "X", "D"], remark: "" },
+    { team: "B", airport: "AP1", terminal: "Terminal 1", area: "Zone A", callsign: "STATION 1", stationNo: "10", title: "EMT", id: "1003", name: "Staff Member B1", phone: "000 0000003", adp: true, tdp: true, shifts: ["X", "D", "D", "N", "N", "X", "X", "X", "X", "D", "D", "N", "N", "X", "X", "X", "X", "D", "D", "N", "N", "X", "X", "X", "X", "D", "D", "N", "N", "X"], remark: "" },
+    { team: "B", airport: "AP1", terminal: "Terminal 3", area: "Zone C", callsign: "STATION 3", stationNo: "30", title: "EMT", id: "1004", name: "Staff Member B2", phone: "000 0000004", adp: false, tdp: true, shifts: ["X", "D", "D", "N", "N", "X", "X", "X", "X", "D", "D", "N", "N", "X", "X", "X", "X", "D", "D", "N", "N", "X", "X", "X", "X", "D", "D", "N", "N", "X"], remark: "" },
+    { team: "C", airport: "AP1", terminal: "Terminal 2", area: "Zone B", callsign: "STATION 2", stationNo: "20", title: "EMT", id: "1005", name: "Staff Member C1", phone: "000 0000005", adp: true, tdp: false, shifts: ["D", "N", "N", "X", "X", "X", "X", "D", "D", "N", "N", "X", "X", "X", "X", "D", "D", "N", "N", "X", "X", "X", "X", "D", "D", "N", "N", "X", "X", "X"], remark: "" },
+    { team: "C", airport: "AP2", terminal: "Terminal 4", area: "Zone D", callsign: "STATION 4", stationNo: "40", title: "EMT", id: "1006", name: "Staff Member C2", phone: "000 0000006", adp: false, tdp: true, shifts: ["D", "N", "N", "X", "X", "X", "X", "D", "D", "N", "N", "X", "X", "X", "X", "D", "D", "N", "N", "X", "X", "X", "X", "D", "D", "N", "N", "X", "X", "X"], remark: "" },
+    { team: "D", airport: "AP1", terminal: "Terminal 3", area: "Zone C", callsign: "STATION 3", stationNo: "30", title: "EMT", id: "1007", name: "Staff Member D1", phone: "000 0000007", adp: false, tdp: false, shifts: ["X", "X", "X", "D", "D", "N", "N", "X", "X", "X", "X", "D", "D", "N", "N", "X", "X", "X", "X", "D", "D", "N", "N", "X", "X", "X", "X", "D", "D", "N"], remark: "" },
+    { team: "D", airport: "AP2", terminal: "Terminal 4", area: "Zone D", callsign: "STATION 4", stationNo: "40", title: "EMT", id: "1008", name: "Staff Member D2", phone: "000 0000008", adp: true, tdp: true, shifts: ["X", "X", "X", "D", "D", "N", "N", "X", "X", "X", "X", "D", "D", "N", "N", "X", "X", "X", "X", "D", "D", "N", "N", "X", "X", "X", "X", "D", "D", "N"], remark: "" }
+  ]
+};
+/* ---------- state ---------- */
+const TODAY=5;
+let day=TODAY, view='dashboard';
+let stfFilter='all',chFilter='all',achFilter='all',initFilter='all';
+const $=s=>document.querySelector(s);
+const esc=s=>(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const CODES={D:{l:'Day'},N:{l:'Night'},X:{l:'Off'},AL:{l:'Leave'}};
+const shiftOn=(s,d)=>s.shifts[d-1]||'X';
+const isDuty=c=>c==='D'||c==='N';
+const dateOf=d=>new Date(2026,5,d);
+const dispName=n=>n.replace(/^(Mr\.|Mrs\.|Miss|Ms\.|Dr\.)\s*/,'');
+const initials=n=>{const p=dispName(n).split(' ').filter(Boolean);return ((p[0]||'')[0]||'')+((p[1]||'')[0]||'');};
+const telOf=p=>'tel:'+String(p).replace(/\s/g,'');
+let STAFF=ROSTER.staff;
+
+/* ---------- storage ---------- */
+const Store=(()=>{let mem={},ok=true;try{localStorage.setItem('__t','1');localStorage.removeItem('__t');}catch(e){ok=false;}
+  return{get:k=>{try{return ok?localStorage.getItem(k):(k in mem?mem[k]:null);}catch(e){return k in mem?mem[k]:null;}},
+         set:(k,v)=>{try{ok?localStorage.setItem(k,v):(mem[k]=v);}catch(e){mem[k]=v;}}};})();
+const uid=()=>(crypto.randomUUID?crypto.randomUUID():'id'+Date.now()+Math.random().toString(16).slice(2));
+const today=()=>new Date().toISOString().slice(0,10);
+const fmtD=d=>{if(!d)return'—';const x=new Date(d+'T00:00');return isNaN(x)?d:String(x.getDate()).padStart(2,'0')+'/'+String(x.getMonth()+1).padStart(2,'0')+'/'+x.getFullYear();};
+let challenges=JSON.parse(Store.get('dcas_ch')||'[]');
+let reports=JSON.parse(Store.get('dcas_rep')||'[]');
+let achievements=JSON.parse(Store.get('dcas_ach')||'[]');
+let initiatives=JSON.parse(Store.get('dcas_init')||'[]');
+const saveCh=()=>Store.set('dcas_ch',JSON.stringify(challenges));
+const saveRep=()=>Store.set('dcas_rep',JSON.stringify(reports));
+const saveAch=()=>Store.set('dcas_ach',JSON.stringify(achievements));
+const saveInit=()=>Store.set('dcas_init',JSON.stringify(initiatives));
+
+/* seed sample data once */
+function seedSample(force){
+  reports=[
+    {id:uid(),month:'2026-01',cases:420,resp:7.8,rosc:9,refusals:35,transfers:180,sample:1},
+    {id:uid(),month:'2026-02',cases:390,resp:7.5,rosc:11,refusals:30,transfers:165,sample:1},
+    {id:uid(),month:'2026-03',cases:455,resp:7.2,rosc:13,refusals:38,transfers:195,sample:1},
+    {id:uid(),month:'2026-04',cases:410,resp:7.6,rosc:10,refusals:33,transfers:172,sample:1},
+    {id:uid(),month:'2026-05',cases:478,resp:7.1,rosc:14,refusals:41,transfers:205,sample:1},
+  ];
+  challenges=[
+    {id:uid(),date:'2026-06-02',category:'Equipment',location:'Terminal 3 · Zone C',description:'Radio dead zone reported near gates.',priority:'High',owner:'Staff D1',status:'In progress',createdAt:Date.now()},
+    {id:uid(),date:'2026-06-04',category:'Field',location:'Terminal 1 · Zone A',description:'Wheelchair access route to first-aid point partially blocked during peak.',priority:'Medium',owner:'',status:'Open',createdAt:Date.now()-1},
+    {id:uid(),date:'2026-05-28',category:'Administrative',location:'Airport 2',description:'Delay in monthly equipment check submission.',priority:'Low',owner:'',status:'Resolved',createdAt:Date.now()-2},
+  ];
+  initiatives=[
+    {id:uid(),title:'Automate department paperwork',desc:'Replace paper handover forms with digital forms linked to a central record.',cat:'Digital transformation',status:'progress',owner:'Staff Member C2',ownerId:'1006',startDate:'2026-06-01',completedDate:'',impact:'Cut processing time, improve accuracy.',createdAt:Date.now()},
+    {id:uid(),title:'Optimise first-aid point distribution',desc:'Use station + case data to position first-aid points by terminal demand.',cat:'Field operations',status:'proposed',owner:'',ownerId:'',startDate:'2026-06-01',completedDate:'',impact:'Faster emergency response.',createdAt:Date.now()-1},
+  ];
+  achievements=[
+    {id:uid(),staffName:'Staff Member C2',staffId:'1006',title:'Built the operations platform',desc:'Developed this internal operations & documentation platform.',cat:'Individual initiative',date:'2026-06-05',notes:'',createdAt:Date.now()},
+  ];
+  saveRep();saveCh();saveInit();saveAch();Store.set('dcas_seeded','1');
+  if(force){renderAll();toast('Sample data loaded');}
+}
+if(!Store.get('dcas_seeded')) seedSample(false);
+
+let toastTimer;
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2400);}
+
+/* ---------- navigation ---------- */
+function go(v){
+  view=v;
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+  $('#view-'+v).classList.add('active');
+  const nm={staff:'more',reports:'more',analytics:'more',achievements:'more',initiatives:'more',upload:'more',settings:'more'};
+  document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.v===(nm[v]||v)));
+  $('#fab').classList.toggle('show',['challenges','achievements','initiatives','reports'].includes(v));
+  window.scrollTo({top:0,behavior:'smooth'});
+  const r={dashboard:renderDashboard,command:renderCommand,roster:renderRoster,challenges:renderChallenges,
+    staff:renderStaff,reports:renderReports,analytics:renderAnalytics,achievements:renderAch,initiatives:renderInit,upload:renderUpload,settings:renderSettings};
+  if(r[v])r[v]();
+}
+function onFab(){({challenges:()=>editChallenge(null),achievements:()=>editAch(null),initiatives:()=>editInit(null),reports:()=>editReport(null)}[view]||(()=>{}))();}
+function stepDay(n){day=Math.min(30,Math.max(1,day+n));refreshDay();}
+function setDay(d){day=d;refreshDay();}
+function refreshDay(){if(view==='dashboard')renderDashboard();if(view==='command')renderCommand();if(view==='roster')renderRoster();}
+
+/* ---------- derived ops data ---------- */
+function stationsList(){
+  const m={};STAFF.filter(s=>s.stationNo).forEach(s=>{const k=s.airport+'·'+s.stationNo;
+    if(!m[k])m[k]={airport:s.airport,terminal:s.terminal,area:s.area,no:s.stationNo,callsign:s.callsign,crew:[]};m[k].crew.push(s);});
+  return Object.values(m).sort((a,b)=>a.airport.localeCompare(b.airport)||(a.terminal||'').localeCompare(b.terminal||'')||(+a.no)-(+b.no));
+}
+const TERMS=[['Terminal 1','AP1','Terminal 1'],['Terminal 2','AP1','Terminal 2'],['Terminal 3','AP1','Terminal 3'],['Terminal 4','AP2',null]];
+function terminalCoverage(d){
+  return TERMS.map(([label,ap,term])=>{
+    const sts=stationsList().filter(s=>s.airport===ap&&(term?s.terminal===term:true));
+    let covered=0,headcount=0;
+    sts.forEach(s=>{const on=s.crew.filter(c=>isDuty(shiftOn(c,d)));headcount+=on.length;if(on.length)covered++;});
+    const gaps=sts.length-covered;
+    const status=gaps===0?'ok':(gaps<=1?'short':'crit');
+    return {label,ap,term,stations:sts.length,covered,gaps,headcount,status};
+  });
+}
+function teamCode(t,d){const c={};STAFF.filter(s=>s.team===t).forEach(s=>{const x=shiftOn(s,d);c[x]=(c[x]||0)+1;});
+  const sorted = Object.entries(c).sort((a,b)=>b[1]-a[1]);
+  return sorted.length ? sorted[0][0] : 'X';
+}
+
+/* ---------- dashboard ---------- */
+function latestReport(){return reports.slice().sort((a,b)=>a.month.localeCompare(b.month)).slice(-1)[0];}
+function prevReport(){const s=reports.slice().sort((a,b)=>a.month.localeCompare(b.month));return s[s.length-2];}
+function mLabel(m){if(!m)return'';const[y,mo]=m.split('-');return new Date(y,mo-1,1).toLocaleDateString('en-US',{month:'long',year:'numeric'});}
+
+function renderDashboard(){
+  $('#dsDate').textContent='June '+day;
+  $('#dsWd').textContent=dateOf(day).toLocaleDateString('en-US',{weekday:'long'});
+  $('#dsToday').classList.toggle('show',day!==TODAY);
+  const onDuty=STAFF.filter(s=>isDuty(shiftOn(s,day))).length;
+  const cov=terminalCoverage(day);
+  const totStations=cov.reduce((a,c)=>a+c.stations,0),totCov=cov.reduce((a,c)=>a+c.covered,0);
+  const covPct=totStations ? Math.round(totCov/totStations*100) : 0;
+  const openIssues=challenges.filter(c=>c.status!=='Resolved').length;
+  $('#liveband').innerHTML=`
+    <div class="live"><div class="n good"><span class="livedot"></span>${onDuty}</div><div class="l">On duty</div></div>
+    <div class="live"><div class="n">${totCov}/${totStations}</div><div class="l">Stations</div></div>
+    <div class="live"><div class="n ${covPct>=90?'good':covPct>=70?'warn':'bad'}">${covPct}%</div><div class="l">Coverage</div></div>
+    <div class="live"><div class="n ${openIssues?'warn':'good'}">${openIssues}</div><div class="l">Open issues</div></div>`;
+
+  const r=latestReport(),p=prevReport();
+  $('#repMonthLbl').textContent=r?mLabel(r.month):'no reports yet';
+  const avail=STAFF.length ? Math.round(onDuty/STAFF.length*100) : 0;
+  const trend=(cur,prev,inv)=>{if(prev==null||cur==null)return'';const up=cur>=prev;const good=inv?!up:up;
+    return `<div class="trend ${good?'up':'down'}">${up?'▲':'▼'} ${Math.abs(cur-prev).toFixed(inv?1:0)}</div>`;};
+  const cards=[
+    {n:r?r.cases:'—',l:'Cases this month',ic:'<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',c:'red',t:r&&p?trend(r.cases,p.cases):''},
+    {n:r?r.resp:'—',u:'min',l:'Avg response time',ic:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',c:'blue',t:r&&p?trend(r.resp,p.resp,true):''},
+    {n:r?r.rosc:'—',l:'ROSC cases',ic:'<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/>',c:'green',t:r&&p?trend(r.rosc,p.rosc):''},
+    {n:avail,u:'%',l:'Staff availability',ic:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>',c:'amber'},
+    {n:openIssues,l:'Open challenges',ic:'<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/>',c:'red'},
+    {n:initiatives.filter(i=>i.status!=='done').length,l:'Active initiatives',ic:'<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',c:'night'},
+  ];
+  const cmap={red:['var(--red-soft)','var(--red-d)'],blue:['var(--blue-soft)','var(--blue)'],green:['var(--green-soft)','var(--green)'],amber:['var(--amber-soft)','var(--amber)'],night:['var(--night-soft)','var(--night)']};
+  $('#mgmtKpis').innerHTML=cards.map(c=>`<div class="kpi"><div class="ic" style="background:${cmap[c.c][0]};color:${cmap[c.c][1]}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${c.ic}</svg></div>
+    <div class="n">${c.n}${c.u?'<small> '+c.u+'</small>':''}</div><div class="l">${c.l}</div>${c.t||''}</div>`).join('');
+
+  $('#dashSpark').innerHTML=sparkline(reports.slice().sort((a,b)=>a.month.localeCompare(b.month)).map(x=>({x:x.month.slice(5),y:x.resp})),'min');
+  $('#dashCoverage').innerHTML=cov.map(c=>covRow(c)).join('');
+  
+  if ($('#menuStaffCount')) $('#menuStaffCount').textContent = STAFF.length + ' staff profiles & portfolios';
+}
+function covRow(c){
+  const sp=c.status==='ok'?['sp-ok','Covered']:c.status==='short'?['sp-short','Short '+c.gaps]:['sp-crit','Critical '+c.gaps];
+  return `<div class="cov-row" onclick="viewTerminal('${c.ap}','${c.term||''}')">
+    <div class="cov-name"><div class="t">${c.label}</div><div class="s">${c.covered}/${c.stations} stations · ${c.headcount} on duty</div></div>
+    <span class="status-pill ${sp[0]}"><span class="d"></span>${sp[1]}</span></div>`;
+}
+
+/* ---------- command center ---------- */
+function renderCommand(){
+  $('#cmdDate').textContent='June '+day;$('#cmdWd').textContent=dateOf(day).toLocaleDateString('en-US',{weekday:'long'});
+  $('#cmdToday').classList.toggle('show',day!==TODAY);$('#cmdDayLbl').textContent='June '+day;
+  const cov=terminalCoverage(day);
+  $('#termMap').innerHTML=cov.map(c=>{
+    const z=c.status==='ok'?'z-ok':c.status==='short'?'z-short':'z-crit';
+    const badge=c.status==='ok'?'Covered':c.status==='short'?'Short '+c.gaps:'Critical';
+    return `<div class="zone ${z}" onclick="viewTerminal('${c.ap}','${c.term||''}')">
+      <div><div class="zt">${c.label}</div><div class="zs">${c.term?c.ap:'Airport 2'}</div></div>
+      <div><span class="zbadge">${badge}</span><div class="zmeta" style="margin-top:8px">${c.covered}/${c.stations} · ${c.headcount} medics</div></div></div>`;
+  }).join('');
+  $('#cmdCoverage').innerHTML=cov.map(c=>{
+    const variance=c.headcount-c.stations;
+    const sp=c.status==='ok'?['sp-ok','Covered']:c.status==='short'?['sp-short','Short']:['sp-crit','Critical'];
+    return `<div class="cov-row" onclick="viewTerminal('${c.ap}','${c.term||''}')">
+      <div class="cov-name"><div class="t">${c.label}</div><div class="s">Expected ${c.stations} · Actual ${c.headcount} on duty</div></div>
+      <span class="cov-var" style="color:${variance>=0?'var(--green)':'var(--red)'}">${variance>=0?'+':''}${variance}</span>
+      <span class="status-pill ${sp[0]}" style="margin-left:10px"><span class="d"></span>${sp[1]}</span></div>`;
+  }).join('');
+}
+function viewTerminal(ap,term){
+  const sts=stationsList().filter(s=>s.airport===ap&&(term?s.terminal===term:true));
+  const label=term||'Airport 2';
+  const issues=challenges.filter(c=>c.status!=='Resolved'&&(c.location||'').toLowerCase().includes((term||'airport').toLowerCase().split(' ')[0]));
+  let h=sts.map(s=>{
+    const on=s.crew.filter(c=>isDuty(shiftOn(c,day)));
+    return `<div style="padding:11px 0;border-top:1px solid var(--line)">
+      <div style="display:flex;align-items:center;gap:10px"><span class="callsign">${esc(s.callsign)}</span>
+        <div style="flex:1"><div style="font-size:13.5px;font-weight:700">${esc(s.area||s.airport)}</div></div>
+        <span class="status-pill ${on.length?'sp-ok':'sp-crit'}"><span class="d"></span>${on.length?on.length+' on duty':'gap'}</span></div>
+      ${on.length?'<div class="crewline" style="margin-top:9px">'+on.map(c=>`<span class="crew-pill" onclick="viewStaff('${c.id}','${c.team}')"><span class="tdot ${c.team}">${c.team}</span>${esc(dispName(c.name))} <span class="scode sc-${shiftOn(c,day)}" style="padding:2px 5px">${shiftOn(c,day)}</span></span>`).join('')+'</div>':''}
+    </div>`;
+  }).join('');
+  openSheet(label+' · June '+day,`
+    ${det('Coverage',`${sts.filter(s=>s.crew.some(c=>isDuty(shiftOn(c,day)))).length}/${sts.length} stations covered`)}
+    ${issues.length?det('Open challenges',issues.map(i=>`<div style="margin-bottom:6px"><span class="pri pri-${i.priority}">${i.priority}</span> ${esc(i.description)}</div>`).join('')):''}
+    <div class="det-row"><div class="k">Stations</div>${h}</div>`);
+}
+
+/* ---------- roster ---------- */
+function renderRoster(){
+  $('#rosMonth').textContent=ROSTER.month;$('#rosDay').textContent='June '+day;
+  $('#strips').innerHTML=ROSTER.teams.map(t=>{
+    let h=`<div class="strip-row"><div class="rl"><span class="tdot ${t}">${t}</span></div>`;
+    for(let d=1;d<=30;d++){const c=teamCode(t,d);h+=`<div class="cell c-${c} ${d===day?'sel':''}" onclick="setDay(${d})"><span class="cd">${d}</span><span class="cc">${c}</span></div>`;}
+    return h+'</div>';
+  }).join('');
+  const duty=STAFF.filter(s=>isDuty(shiftOn(s,day))).sort((a,b)=>a.airport.localeCompare(b.airport)||(+a.stationNo||99)-(+b.stationNo||99));
+  $('#rosDuty').innerHTML=duty.length?`<p style="font-size:12px;color:var(--muted);margin:0 2px 8px">${duty.length} staff on duty</p>`+duty.map(s=>`
+    <div class="staff-row" style="padding:8px 0;border-top:1px solid var(--line)" onclick="viewStaff('${s.id}','${s.team}')">
+      <span class="callsign" style="font-size:11px;padding:4px 7px">${esc(s.callsign)}</span>
+      <div class="info"><div class="nm" style="font-size:13.5px">${esc(dispName(s.name))}</div><div class="sub">${esc(s.area||s.airport)} · Team ${s.team}</div></div>
+      <span class="scode sc-${shiftOn(s,day)}">${CODES[shiftOn(s,day)].l}</span></div>`).join(''):'<p style="color:var(--muted);font-size:13.5px;margin:4px 2px">No staff on duty this day.</p>';
+}
+
+/* ---------- staff ---------- */
+function renderStaff(){
+  const q=($('#stfSearch').value||'').trim().toLowerCase();
+  const f=[['all','All'],['A','Team A'],['B','Team B'],['C','Team C'],['D','Team D'],['SIC','Supervisors']];
+  $('#stfChips').innerHTML=f.map(([k,l])=>`<button class="chip ${stfFilter===k?'active':''}" onclick="stfFilter='${k}';renderStaff()">${l}</button>`).join('');
+  let list=STAFF.slice();
+  if(['A','B','C','D'].includes(stfFilter))list=list.filter(s=>s.team===stfFilter);
+  else if(stfFilter==='SIC')list=list.filter(s=>s.title==='SIC');
+  if(q)list=list.filter(s=>(s.name+' '+s.id+' '+s.callsign+' '+s.phone+' '+s.area+' '+s.terminal).toLowerCase().includes(q));
+  list.sort((a,b)=>dispName(a.name).localeCompare(dispName(b.name)));
+  $('#stfCount').textContent=STAFF.length+' staff';
+  $('#stfList').innerHTML=list.length?list.map((s,i)=>{const c=shiftOn(s,day);
+    return `<div class="rec" style="animation-delay:${i*.01}s;padding:12px 14px" onclick="viewStaff('${s.id}','${s.team}')">
+      <div class="staff-row"><div class="avatar">${esc(initials(s.name))}</div>
+        <div class="info"><div class="nm">${esc(dispName(s.name))}</div><div class="sub"><span class="mono">${esc(s.callsign)}</span> · ${esc(s.title)} · Team ${s.team}</div></div>
+        <span class="scode sc-${c}">${c}</span></div></div>`;}).join(''):emptyState('No staff match');
+}
+function viewStaff(id,team){
+  const s=STAFF.find(x=>x.id===id&&x.team===team)||STAFF.find(x=>x.id===id);if(!s)return;
+  const tagT=s.title==='SIC'?'sic':s.title==='EMT-A'?'ema':'';
+  const cnt=c=>s.shifts.filter(x=>x===c).length;
+  const myAch=achievements.filter(a=>(a.staffId&&a.staffId===s.id)||dispName(a.staffName||'').toLowerCase()===dispName(s.name).toLowerCase());
+  const myInit=initiatives.filter(i=>(i.ownerId&&i.ownerId===s.id)||dispName(i.owner||'').toLowerCase()===dispName(s.name).toLowerCase());
+  openSheet(dispName(s.name),`
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+      <span class="tag ${tagT}">${esc(s.title)}</span><span class="tag team${s.team}">Team ${s.team}</span>
+      ${s.adp?'<span class="tag">ADP</span>':''}${s.tdp?'<span class="tag">TDP</span>':''}</div>
+    ${det('Station',`<span class="mono" style="color:var(--red-d);font-weight:600">${esc(s.callsign)}</span> · ${esc([s.airport==='AP2'?'Airport 2':s.airport,s.terminal,s.area].filter(Boolean).join(' · '))}`)}
+    ${det('Staff ID','<span class="mono">'+esc(s.id)+'</span>')}
+    ${det('Phone',`<a class="callbtn" href="${telOf(s.phone)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3.1-8.7A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 2 .7 2.9a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.9.6 2.9.7a2 2 0 0 1 1.7 2z"/></svg>${esc(s.phone)}</a>`)}
+    ${det('Attendance — June',`<span style="color:var(--day);font-weight:600">${cnt('D')} day</span> · <span style="color:var(--night);font-weight:600">${cnt('N')} night</span> · ${cnt('X')} off${cnt('AL')?' · <span style="color:var(--leave);font-weight:600">'+cnt('AL')+' leave</span>':''}`)}
+    ${s.remark?det('Note','<span style="color:var(--leave);font-weight:600">'+esc(s.remark)+'</span>'):''}
+    ${det('Achievements',myAch.length?myAch.map(a=>`<div style="margin-bottom:6px">• ${esc(a.title)} <span style="color:var(--muted);font-size:12px">(${fmtD(a.date)})</span></div>`).join(''):'<span style="color:var(--muted)">None recorded yet</span>')}
+    ${det('Initiatives',myInit.length?myInit.map(i=>`<div style="margin-bottom:6px">• ${esc(i.title)}</div>`).join(''):'<span style="color:var(--muted)">None</span>')}
+    ${det('Shift schedule — June 2026',miniCal(s))}`);
+}
+function miniCal(s){let h='<div class="minical">';for(let d=1;d<=30;d++){const c=shiftOn(s,d);h+=`<div class="mc c-${c} ${d===TODAY?'today':''}"><div class="d">${d}</div><div class="c">${c}</div></div>`;}return h+'</div>';}
+
+/* ---------- challenges ---------- */
+const stCls=s=>({'Open':'open','In progress':'prog','Resolved':'res'}[s]||'open');
+const PRIOS=['Low','Medium','High','Critical'],CH_STATUS=['Open','In progress','Resolved'],CH_CATS=['Field','Equipment','Administrative','Staffing','Safety','Other'];
+function renderChallenges(){
+  const q=($('#chSearch').value||'').trim().toLowerCase();
+  const open=challenges.filter(c=>c.status==='Open').length,prog=challenges.filter(c=>c.status==='In progress').length,res=challenges.filter(c=>c.status==='Resolved').length;
+  $('#chStats').innerHTML=[['Open',open,'var(--red-d)'],['In progress',prog,'var(--amber)'],['Resolved',res,'var(--green)']].map(([l,n,c])=>`<div class="kpi" style="padding:12px"><div class="n" style="color:${c};font-size:22px">${n}</div><div class="l">${l}</div></div>`).join('');
+  $('#chChips').innerHTML=[{k:'all',t:'All'},...CH_STATUS.map(s=>({k:s,t:s})),...PRIOS.map(p=>({k:p,t:p}))].map(c=>`<button class="chip ${chFilter===c.k?'active':''}" onclick="chFilter='${c.k.replace(/'/g,"")}';renderChallenges()">${c.t}</button>`).join('');
+  let list=challenges.slice().sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  if(CH_STATUS.includes(chFilter))list=list.filter(c=>c.status===chFilter);
+  else if(PRIOS.includes(chFilter))list=list.filter(c=>c.priority===chFilter);
+  if(q)list=list.filter(c=>(c.description+' '+c.category+' '+(c.location||'')+' '+(c.owner||'')).toLowerCase().includes(q));
+  $('#chCount').textContent=challenges.length+' total';
+  $('#chList').innerHTML=list.length?list.map((c,i)=>`
+    <div class="rec" style="animation-delay:${i*.02}s" onclick="viewChallenge('${c.id}')">
+      <div class="crewline" style="margin:0 0 9px"><span class="pri pri-${c.priority}">${c.priority}</span><span class="st st-${stCls(c.status)}">${c.status}</span><span class="tag" style="background:transparent;color:var(--muted)">${fmtD(c.date)}</span></div>
+      <div class="rec-main"><div class="t" style="font-size:14px;line-height:1.45">${esc(c.description)}</div>
+        <div class="m" style="margin-top:6px">${esc(c.category)}${c.location?' · '+esc(c.location):''}${c.owner?' · '+esc(c.owner):''}</div></div></div>`).join(''):emptyState('No challenges — tap + to log one');
+}
+function editChallenge(id){
+  const c=id?challenges.find(x=>x.id===id):{date:today(),category:'Field',location:'',description:'',priority:'Medium',owner:'',status:'Open'};
+  openSheet(id?'Edit challenge':'Log challenge',`
+    <div class="field"><label>Description <span class="req">*</span></label><textarea id="c_desc" placeholder="What is the issue?">${esc(c.description)}</textarea></div>
+    <div class="field-row"><div class="field"><label>Category</label><select id="c_cat">${CH_CATS.map(x=>`<option ${c.category===x?'selected':''}>${x}</option>`).join('')}</select></div>
+      <div class="field"><label>Priority</label><select id="c_pri">${PRIOS.map(x=>`<option ${c.priority===x?'selected':''}>${x}</option>`).join('')}</select></div></div>
+    <div class="field"><label>Location / terminal</label><input id="c_loc" value="${esc(c.location)}" placeholder="e.g. Terminal 3 · Concourse B"></div>
+    <div class="field-row"><div class="field"><label>Owner</label><input id="c_own" value="${esc(c.owner)}" placeholder="Assigned to"></div>
+      <div class="field"><label>Status</label><select id="c_st">${CH_STATUS.map(x=>`<option ${c.status===x?'selected':''}>${x}</option>`).join('')}</select></div></div>
+    <div class="field"><label>Date</label><input id="c_date" type="date" value="${esc(c.date)}"></div>
+    <button class="btn btn-primary" onclick="saveChallenge('${id||''}')">${id?'Save changes':'Log challenge'}</button>`);
+}
+function saveChallenge(id){const desc=$('#c_desc').value.trim();if(!desc){toast('Please add a description');return;}
+  const d={date:$('#c_date').value,category:$('#c_cat').value,location:$('#c_loc').value.trim(),description:desc,priority:$('#c_pri').value,owner:$('#c_own').value.trim(),status:$('#c_st').value};
+  if(id)Object.assign(challenges.find(x=>x.id===id),d);else challenges.push({id:uid(),createdAt:Date.now(),...d});
+  saveCh();closeSheet();renderChallenges();toast(id?'Saved':'Challenge logged');}
+function viewChallenge(id){const c=challenges.find(x=>x.id===id);if(!c)return;
+  openSheet('Challenge',`<div class="crewline" style="margin-bottom:8px"><span class="pri pri-${c.priority}">${c.priority}</span><span class="st st-${stCls(c.status)}">${c.status}</span></div>
+    ${det('Description',esc(c.description))}${det('Category',esc(c.category))}${c.location?det('Location',esc(c.location)):''}${c.owner?det('Owner',esc(c.owner)):''}${det('Date',fmtD(c.date))}
+    <div class="btn-row" style="margin-top:14px"><button class="btn btn-ghost" onclick="editChallenge('${c.id}')">Edit</button><button class="btn btn-danger" onclick="delChallenge('${c.id}')">Delete</button></div>`);}
+function delChallenge(id){if(!confirm('Delete this challenge?'))return;challenges=challenges.filter(x=>x.id!==id);saveCh();closeSheet();renderChallenges();toast('Deleted');}
+
+/* ---------- reports ---------- */
+function renderReports(){
+  const list=reports.slice().sort((a,b)=>b.month.localeCompare(a.month));
+  $('#repCount').textContent=reports.length+' months';
+  $('#repList').innerHTML=list.length?list.map(r=>`
+    <div class="rec" onclick="viewReport('${r.id}')">
+      <div class="rec-top"><div class="rec-main"><div class="t">${mLabel(r.month)}${r.sample?' <span class="tag" style="background:var(--amber-soft);color:var(--amber)">sample</span>':''}</div></div></div>
+      <div class="crewline" style="margin-top:10px">
+        <span class="tag">${r.cases} cases</span><span class="tag">${r.resp} min</span><span class="tag" style="background:var(--green-soft);color:var(--green)">${r.rosc} ROSC</span>
+        <span class="tag" style="background:transparent;color:var(--muted)">${r.transfers} transfers · ${r.refusals} refusals</span></div></div>`).join(''):emptyState('No reports — upload an Excel or add manually');
+}
+function editReport(id){
+  const r=id?reports.find(x=>x.id===id):{month:today().slice(0,7),cases:'',resp:'',rosc:'',refusals:'',transfers:''};
+  openSheet(id?'Edit report':'Add monthly report',`
+    <div class="field"><label>Month <span class="req">*</span></label><input id="r_month" type="month" value="${esc(r.month)}"></div>
+    <div class="field-row"><div class="field"><label>Total cases</label><input id="r_cases" type="number" value="${esc(r.cases)}"></div>
+      <div class="field"><label>Avg response (min)</label><input id="r_resp" type="number" step="0.1" value="${esc(r.resp)}"></div></div>
+    <div class="field-row"><div class="field"><label>ROSC cases</label><input id="r_rosc" type="number" value="${esc(r.rosc)}"></div>
+      <div class="field"><label>Refusals</label><input id="r_ref" type="number" value="${esc(r.refusals)}"></div></div>
+    <div class="field"><label>Transfers</label><input id="r_tr" type="number" value="${esc(r.transfers)}"></div>
+    <button class="btn btn-primary" onclick="saveReport('${id||''}')">${id?'Save':'Add report'}</button>`);
+}
+function saveReport(id){const m=$('#r_month').value;if(!m){toast('Pick a month');return;}
+  const d={month:m,cases:+$('#r_cases').value||0,resp:+$('#r_resp').value||0,rosc:+$('#r_rosc').value||0,refusals:+$('#r_ref').value||0,transfers:+$('#r_tr').value||0,sample:0};
+  const ex=reports.find(x=>x.month===m&&x.id!==id);if(ex)Object.assign(ex,d);
+  else if(id)Object.assign(reports.find(x=>x.id===id),d);else reports.push({id:uid(),...d});
+  saveRep();closeSheet();renderReports();toast('Report saved');}
+function viewReport(id){const r=reports.find(x=>x.id===id);if(!r)return;
+  openSheet(mLabel(r.month),`${det('Total cases',r.cases)}${det('Avg response time',r.resp+' min')}${det('ROSC cases',r.rosc)}${det('Refusals',r.refusals)}${det('Transfers',r.transfers)}
+    <div class="btn-row" style="margin-top:14px"><button class="btn btn-ghost" onclick="editReport('${r.id}')">Edit</button><button class="btn btn-danger" onclick="delReport('${r.id}')">Delete</button></div>`);}
+function delReport(id){if(!confirm('Delete this report?'))return;reports=reports.filter(x=>x.id!==id);saveRep();closeSheet();renderReports();toast('Deleted');}
+
+/* ---------- analytics ---------- */
+function renderAnalytics(){
+  const rs=reports.slice().sort((a,b)=>a.month.localeCompare(b.month));
+  const byTeam={};STAFF.forEach(s=>byTeam[s.team]=(byTeam[s.team]||0)+1);
+  const byTerm=TERMS.map(([l,ap,t])=>[l,STAFF.filter(s=>s.airport===ap&&(t?s.terminal===t:true)).length]);
+  $('#analytics').innerHTML=`
+    <div class="card"><div class="card-h">Cases by month</div>${barChart(rs.map(r=>({x:r.month.slice(5),y:r.cases})))}</div>
+    <div class="card"><div class="card-h">Avg response time (min)</div>${sparkline(rs.map(r=>({x:r.month.slice(5),y:r.resp})),'min')}</div>
+    <div class="card"><div class="card-h">ROSC cases by month</div>${barChart(rs.map(r=>({x:r.month.slice(5),y:r.rosc})),'var(--green)')}</div>
+    <div class="card"><div class="card-h">Staff by terminal</div>${barChart(byTerm.map(([x,y])=>({x:x.replace('Terminal ','T').replace('Airport 2','AP2'),y})),'var(--night)')}</div>
+    <div class="card"><div class="card-h">Staff by team</div>${barChart(Object.entries(byTeam).map(([x,y])=>({x,y})),'var(--red)')}</div>`;
+}
+
+/* ---------- charts ---------- */
+function barChart(data,color){
+  if(!data.length)return '<p style="color:var(--muted);font-size:13px">No data</p>';
+  const W=320,H=140,pad=24,bw=(W-pad*2)/data.length*.6,gap=(W-pad*2)/data.length;
+  const max=Math.max(...data.map(d=>d.y),1);
+  let bars='',labels='';
+  data.forEach((d,i)=>{const h=(d.y/max)*(H-pad*2);const x=pad+i*gap+(gap-bw)/2;const y=H-pad-h;
+    bars+=`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="3" fill="${color||'var(--red)'}"/>`;
+    bars+=`<text x="${(x+bw/2).toFixed(1)}" y="${(y-4).toFixed(1)}" text-anchor="middle">${d.y}</text>`;
+    labels+=`<text x="${(x+bw/2).toFixed(1)}" y="${H-8}" text-anchor="middle">${esc(d.x)}</text>`;});
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"><line class="axis" x1="${pad}" y1="${H-pad}" x2="${W-pad}" y2="${H-pad}"/>${bars}${labels}</svg>`;
+}
+function sparkline(data,unit){
+  if(data.length<2)return '<p style="color:var(--muted);font-size:13px">Need 2+ months</p>';
+  const W=320,H=130,pad=24;const ys=data.map(d=>d.y);const min=Math.min(...ys),max=Math.max(...ys);const rng=max-min||1;
+  const px=i=>pad+i*((W-pad*2)/(data.length-1));const py=v=>H-pad-((v-min)/rng)*(H-pad*2);
+  let pts=data.map((d,i)=>`${px(i).toFixed(1)},${py(d.y).toFixed(1)}`).join(' ');
+  let area=`${pad},${H-pad} ${pts} ${(W-pad)},${H-pad}`;
+  let dots=data.map((d,i)=>`<circle cx="${px(i).toFixed(1)}" cy="${py(d.y).toFixed(1)}" r="3" fill="var(--red)"/><text x="${px(i).toFixed(1)}" y="${(py(d.y)-8).toFixed(1)}" text-anchor="middle">${d.y}</text>`).join('');
+  let labels=data.map((d,i)=>`<text x="${px(i).toFixed(1)}" y="${H-8}" text-anchor="middle">${esc(d.x)}</text>`).join('');
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"><polygon class="sparkfill" points="${area}"/><polyline class="spark" points="${pts}"/>${dots}${labels}</svg>`;
+}
+
+/* ---------- achievements + initiatives ---------- */
+const ACH_CATS=['Appreciation','Excellence certificate','Field achievement','Individual initiative','Award','Commendation'];
+function renderAch(){
+  const q=($('#achSearch').value||'').trim().toLowerCase();
+  $('#achChips').innerHTML=[{k:'all',t:'All'},...ACH_CATS.map(c=>({k:c,t:c}))].map(c=>`<button class="chip ${achFilter===c.k?'active':''}" onclick="achFilter='${c.k.replace(/'/g,"")}';renderAch()">${c.t}</button>`).join('');
+  let list=achievements.slice().sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  if(achFilter!=='all')list=list.filter(a=>a.cat===achFilter);
+  if(q)list=list.filter(a=>((a.staffName||'')+' '+(a.staffId||'')+' '+a.title+' '+(a.desc||'')).toLowerCase().includes(q));
+  $('#achCount').textContent=achievements.length+' total';
+  $('#achList').innerHTML=list.length?list.map((a,i)=>`<div class="rec" style="animation-delay:${i*.02}s" onclick="viewAch('${a.id}')">
+    <div class="rec-main"><div class="t">${esc(a.title)}</div><div class="m" style="margin-top:3px"><b style="color:var(--ink2)">${esc(a.staffName||'—')}</b>${a.staffId?' · ID '+esc(a.staffId):''}</div></div>
+    <div class="crewline" style="margin-top:10px">${a.cat?`<span class="scode sc-AL">${esc(a.cat)}</span>`:''}<span class="tag" style="background:transparent;color:var(--muted)">${fmtD(a.date)}</span></div></div>`).join(''):emptyState('No achievements — tap + to record');
+}
+function editAch(id){const a=id?achievements.find(x=>x.id===id):{staffName:'',staffId:'',title:'',desc:'',cat:ACH_CATS[0],date:today(),notes:''};
+  openSheet(id?'Edit achievement':'Record achievement',`
+    <div class="field-row"><div class="field"><label>Staff name <span class="req">*</span></label><input id="a_name" value="${esc(a.staffName)}" placeholder="Full name"></div>
+      <div class="field"><label>Staff ID</label><input id="a_id" value="${esc(a.staffId)}" inputmode="numeric" placeholder="ID"></div></div>
+    <div class="field"><label>Achievement <span class="req">*</span></label><input id="a_title" value="${esc(a.title)}" placeholder="Title"></div>
+    <div class="field"><label>Description</label><textarea id="a_desc">${esc(a.desc)}</textarea></div>
+    <div class="field-row"><div class="field"><label>Type</label><select id="a_cat">${ACH_CATS.map(c=>`<option ${a.cat===c?'selected':''}>${c}</option>`).join('')}</select></div>
+      <div class="field"><label>Date</label><input id="a_date" type="date" value="${esc(a.date)}"></div></div>
+    <div class="field"><label>Notes / reference</label><textarea id="a_notes">${esc(a.notes)}</textarea></div>
+    <button class="btn btn-primary" onclick="saveAchForm('${id||''}')">${id?'Save':'Record'}</button>`);}
+function saveAchForm(id){const name=$('#a_name').value.trim(),title=$('#a_title').value.trim();if(!name||!title){toast('Name and title required');return;}
+  const d={staffName:name,staffId:$('#a_id').value.trim(),title,desc:$('#a_desc').value.trim(),cat:$('#a_cat').value,date:$('#a_date').value,notes:$('#a_notes').value.trim()};
+  if(id)Object.assign(achievements.find(x=>x.id===id),d);else achievements.push({id:uid(),createdAt:Date.now(),...d});
+  saveAch();closeSheet();renderAch();toast(id?'Saved':'Recorded');}
+function viewAch(id){const a=achievements.find(x=>x.id===id);if(!a)return;
+  openSheet('Achievement',`<h3 style="font-size:18px;margin-bottom:8px">${esc(a.title)}</h3>
+    <div class="crewline" style="margin-bottom:6px"><span class="scode sc-AL">${esc(a.cat||'')}</span><span class="tag" style="background:transparent;color:var(--muted)">${fmtD(a.date)}</span></div>
+    ${det('Staff',esc(a.staffName)+(a.staffId?' · ID '+esc(a.staffId):''))}${a.desc?det('Description',esc(a.desc)):''}${a.notes?det('Notes',esc(a.notes)):''}
+    <div class="btn-row" style="margin-top:14px"><button class="btn btn-ghost" onclick="editAch('${a.id}')">Edit</button><button class="btn btn-danger" onclick="delAch('${a.id}')">Delete</button></div>`);}
+function delAch(id){if(!confirm('Delete?'))return;achievements=achievements.filter(x=>x.id!==id);saveAch();closeSheet();renderAch();toast('Deleted');}
+
+const INIT_CATS=['Digital transformation','Service development','Field operations','Administrative','Training'];
+const I_ST=[{k:'proposed',t:'Proposed',c:'sc-N'},{k:'progress',t:'In progress',c:'sc-D'},{k:'done',t:'Completed',c:'sc-AL'},{k:'hold',t:'On hold',c:'sc-X'}];
+const iSt=k=>I_ST.find(s=>s.k===k)||I_ST[0];
+function renderInit(){
+  const q=($('#initSearch').value||'').trim().toLowerCase();
+  $('#initChips').innerHTML=[{k:'all',t:'All'},...I_ST].map(s=>`<button class="chip ${initFilter===s.k?'active':''}" onclick="initFilter='${s.k}';renderInit()">${s.t}</button>`).join('');
+  let list=initiatives.slice().sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  if(initFilter!=='all')list=list.filter(i=>i.status===initFilter);
+  if(q)list=list.filter(i=>(i.title+' '+i.desc+' '+(i.owner||'')+' '+(i.cat||'')).toLowerCase().includes(q));
+  $('#initCount').textContent=initiatives.length+' total';
+  $('#initList').innerHTML=list.length?list.map((i,idx)=>{const s=iSt(i.status);
+    return `<div class="rec" style="animation-delay:${idx*.02}s" onclick="viewInit('${i.id}')"><div class="rec-main"><div class="t">${esc(i.title)}</div>
+      ${i.desc?`<div class="m" style="margin-top:6px;color:var(--ink2);font-size:13px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(i.desc)}</div>`:''}</div>
+      <div class="crewline" style="margin-top:11px"><span class="scode ${s.c}">${s.t}</span>${i.cat?`<span class="tag">${esc(i.cat)}</span>`:''}${i.owner?`<span class="tag" style="background:transparent;color:var(--muted)">${esc(i.owner)}</span>`:''}</div></div>`;}).join(''):emptyState('No initiatives — tap + to add');
+}
+function editInit(id){const it=id?initiatives.find(i=>i.id===id):{title:'',desc:'',cat:INIT_CATS[0],owner:'',ownerId:'',status:'proposed',startDate:today(),completedDate:'',impact:''};
+  openSheet(id?'Edit initiative':'New initiative',`
+    <div class="field"><label>Title <span class="req">*</span></label><input id="f_title" value="${esc(it.title)}"></div>
+    <div class="field"><label>Description</label><textarea id="f_desc">${esc(it.desc)}</textarea></div>
+    <div class="field-row"><div class="field"><label>Category</label><select id="f_cat">${INIT_CATS.map(c=>`<option ${it.cat===c?'selected':''}>${c}</option>`).join('')}</select></div>
+      <div class="field"><label>Status</label><select id="f_status">${I_ST.map(s=>`<option value="${s.k}" ${it.status===s.k?'selected':''}>${s.t}</option>`).join('')}</select></div></div>
+    <div class="field-row"><div class="field"><label>Owner</label><input id="f_owner" value="${esc(it.owner)}"></div><div class="field"><label>Staff ID</label><input id="f_oid" value="${esc(it.ownerId)}" inputmode="numeric"></div></div>
+    <div class="field-row"><div class="field"><label>Start</label><input id="f_start" type="date" value="${esc(it.startDate)}"></div><div class="field"><label>Completed</label><input id="f_done" type="date" value="${esc(it.completedDate)}"></div></div>
+    <div class="field"><label>Impact / notes</label><textarea id="f_impact">${esc(it.impact)}</textarea></div>
+    <button class="btn btn-primary" onclick="saveInitForm('${id||''}')">${id?'Save':'Add initiative'}</button>`);}
+function saveInitForm(id){const title=$('#f_title').value.trim();if(!title){toast('Title required');return;}
+  const d={title,desc:$('#f_desc').value.trim(),cat:$('#f_cat').value,status:$('#f_status').value,owner:$('#f_owner').value.trim(),ownerId:$('#f_oid').value.trim(),startDate:$('#f_start').value,completedDate:$('#f_done').value,impact:$('#f_impact').value.trim()};
+  if(id)Object.assign(initiatives.find(x=>x.id===id),d);else initiatives.push({id:uid(),createdAt:Date.now(),...d});
+  saveInit();closeSheet();renderInit();toast(id?'Saved':'Added');}
+function viewInit(id){const i=initiatives.find(x=>x.id===id);if(!i)return;const s=iSt(i.status);
+  openSheet('Initiative',`<h3 style="font-size:18px;margin-bottom:8px">${esc(i.title)}</h3>
+    <div class="crewline" style="margin-bottom:6px"><span class="scode ${s.c}">${s.t}</span>${i.cat?`<span class="tag">${esc(i.cat)}</span>`:''}</div>
+    ${i.desc?det('Description',esc(i.desc)):''}${i.owner?det('Owner',esc(i.owner)+(i.ownerId?' · '+esc(i.ownerId):'')):''}${det('Dates','Start: '+fmtD(i.startDate)+(i.completedDate?' · Completed: '+fmtD(i.completedDate):''))}${i.impact?det('Impact',esc(i.impact)):''}
+    <div class="btn-row" style="margin-top:14px"><button class="btn btn-ghost" onclick="editInit('${i.id}')">Edit</button><button class="btn btn-danger" onclick="delInit('${i.id}')">Delete</button></div>`);}
+function delInit(id){if(!confirm('Delete?'))return;initiatives=initiatives.filter(x=>x.id!==id);saveInit();closeSheet();renderInit();toast('Deleted');}
+
+/* ---------- Excel I/O (SheetJS) ---------- */
+const hasXLSX=()=>typeof XLSX!=='undefined';
+function renderSettings(){$('#xlsxState').textContent=hasXLSX()?'ready':'loading…';}
+function renderUpload(){
+  const card=(id,title,desc,col,tpl)=>`
+    <div class="di" style="background:${col[0]};color:${col[1]}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/></svg></div>
+    <div class="dt">${title}</div><div class="dd">${desc}</div>${tpl?`<span class="tpl" onclick="event.stopPropagation();${tpl}">↓ Download template</span>`:''}`;
+  $('#dropRoster').innerHTML=card('roster','Upload Roster','.xlsx schedule (teams .A.–.D.)',['var(--blue-soft)','var(--blue)'],'');
+  $('#dropReport').innerHTML=card('report','Upload Monthly Report','Cases · response · ROSC',['var(--green-soft)','var(--green)'],'tplReport()');
+  $('#dropAch').innerHTML=card('ach','Upload Achievement Report','Bulk staff achievements',['var(--gold-soft)','var(--gold)'],'tplAch()');
+  ['dropRoster|roster','dropReport|report','dropAch|ach'].forEach(p=>{const[id,kind]=p.split('|');const el=$('#'+id);
+    el.onclick=()=>pickFile(kind);
+    el.ondragover=e=>{e.preventDefault();el.classList.add('over');};el.ondragleave=()=>el.classList.remove('over');
+    el.ondrop=e=>{e.preventDefault();el.classList.remove('over');if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0],kind);};});
+}
+let pickKind='roster';
+function pickFile(kind){if(!hasXLSX()){toast('Excel engine still loading — try again');return;}pickKind=kind;$('#fileIn').value='';$('#fileIn').click();}
+$('#fileIn').addEventListener('change',e=>{if(e.target.files[0])handleFile(e.target.files[0],pickKind);});
+function handleFile(file,kind){
+  if(!hasXLSX()){toast('Excel engine not ready');return;}
+  const r=new FileReader();
+  r.onload=ev=>{try{const wb=XLSX.read(ev.target.result,{type:'array'});
+    if(kind==='roster')importRoster(wb);else if(kind==='report')importReports(wb);else importAchievements(wb);
+  }catch(err){toast('Could not read the file');console.error(err);}};
+  r.readAsArrayBuffer(file);
+}
+function importRoster(wb){
+  const dotted=wb.SheetNames.filter(n=>/^\..*\.$/.test(n));
+  if(!dotted.length){toast('No team sheets (.A.–.D.) found');return;}
+  const AIR={'Airport 1':'AP1','Airport 2':'AP2'};
+  const SEC=['RELIEVERS','RELIEVERS from Other Areas','Overtime','Swap','ANNUAL LEAVES','SPECIAL DUTY'];
+  const tc=s=>s&&s===s.toUpperCase()?s.replace(/\b\w/g,m=>m.toUpperCase()).toLowerCase().replace(/\b\w/g,m=>m.toUpperCase()):s;
+  const out=[];
+  dotted.forEach(sn=>{const team=sn.replace(/\./g,'');const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:''});
+    let airport='AP1',term='',area='',cs='',supp=false;
+    rows.forEach(R=>{const c=R.map(x=>String(x==null?'':x).trim().replace(/\n/g,' '));while(c.length<41)c.push('');
+      if(c[2]==='CALL SIGN'){if(AIR[c[0]])airport=AIR[c[0]];supp=false;return;}
+      if(AIR[c[0]]){airport=AIR[c[0]];supp=false;}if(SEC.includes(c[0]))supp=true;if(supp)return;
+      if(c[0]&&!AIR[c[0]])term=c[0];if(c[1])area=c[1];if(c[2])cs=c[2];
+      const name=c[5],sid=String(c[4]).replace(/\.0$/,'');if(!name||!sid)return;
+      let days=c.slice(9,39).map(x=>x||'X');while(days.length<30)days.push('X');
+      const no=(cs.toUpperCase().indexOf('STATION')===0)?cs.replace(/\D/g,''):'';
+      const sup=cs==='Supervisor';
+      out.push({team,airport,terminal:sup?'':term,area:sup?'':area,callsign:no?'STATION '+no:cs,stationNo:no,title:c[3],id:sid,name,phone:c[6],adp:c[7].toUpperCase()==='ADP',tdp:c[8].toUpperCase()==='TDP',shifts:days,remark:c[39]||''});});
+  });
+  if(!out.length){toast('No staff rows parsed');return;}
+  ROSTER.staff=out;STAFF=out;ROSTER.teams=[...new Set(out.map(s=>s.team))].sort();
+  Store.set('dcas_roster',JSON.stringify({staff:out,teams:ROSTER.teams}));
+  toast(out.length+' staff loaded from Excel');go('roster');
+}
+function importReports(wb){const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});let n=0;
+  rows.forEach(row=>{const g=k=>row[Object.keys(row).find(x=>x.toLowerCase().includes(k))||'']||'';
+    let m=String(g('month')).trim();if(!m)return;if(/^\d{4}-\d{2}/.test(m))m=m.slice(0,7);
+    const d={month:m,cases:+g('case')||0,resp:+g('response')||0,rosc:+g('rosc')||0,refusals:+g('refus')||0,transfers:+g('transfer')||0,sample:0};
+    const ex=reports.find(x=>x.month===m);if(ex)Object.assign(ex,d);else reports.push({id:uid(),...d});n++;});
+  saveRep();toast(n+' month(s) imported');go('reports');}
+function importAchievements(wb){const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});let n=0;
+  rows.forEach(row=>{const g=k=>row[Object.keys(row).find(x=>x.toLowerCase().includes(k))||'']||'';
+    const name=String(g('name')).trim();const title=String(g('achiev')||g('title')).trim();if(!name||!title)return;
+    achievements.push({id:uid(),createdAt:Date.now(),staffName:name,staffId:String(g('id')).replace(/\.0$/,''),title,desc:String(g('desc')),cat:String(g('type')||g('cat'))||'Appreciation',date:String(g('date'))||today(),notes:String(g('note'))});n++;});
+  saveAch();toast(n+' achievement(s) imported');go('achievements');}
+
+function tplReport(){const aoa=[['Month','Cases','Avg Response (min)','ROSC','Refusals','Transfers'],['2026-06',0,0,0,0,0]];writeBook('monthly-report-template.xlsx',{'Monthly Report':aoa});}
+function tplAch(){const aoa=[['Name','Staff ID','Achievement','Description','Type','Date','Notes'],['','','','','Appreciation','','']];writeBook('achievement-template.xlsx',{'Achievements':aoa});}
+function writeBook(name,sheets){if(!hasXLSX()){toast('Excel engine not ready');return;}const wb=XLSX.utils.book_new();
+  Object.entries(sheets).forEach(([n,aoa])=>{const ws=Array.isArray(aoa[0])?XLSX.utils.aoa_to_sheet(aoa):XLSX.utils.json_to_sheet(aoa);XLSX.utils.book_append_sheet(wb,ws,n.slice(0,31));});
+  XLSX.writeFile(wb,name);}
+function exportAllExcel(){if(!hasXLSX()){toast('Excel engine not ready');return;}
+  writeBook('ops-data-'+today()+'.xlsx',{
+    'Challenges':challenges.map(c=>({Date:c.date,Category:c.category,Location:c.location,Description:c.description,Priority:c.priority,Owner:c.owner,Status:c.status})),
+    'Reports':reports.map(r=>({Month:r.month,Cases:r.cases,'Avg Response':r.resp,ROSC:r.rosc,Refusals:r.refusals,Transfers:r.transfers})),
+    'Achievements':achievements.map(a=>({Name:a.staffName,'Staff ID':a.staffId,Achievement:a.title,Description:a.desc,Type:a.cat,Date:a.date,Notes:a.notes})),
+    'Initiatives':initiatives.map(i=>({Title:i.title,Description:i.desc,Category:i.cat,Status:i.status,Owner:i.owner,'Start':i.startDate,'Completed':i.completedDate,Impact:i.impact})),
+  });toast('Exported to Excel');}
+function resetSample(){if(!confirm('Reload demo reports & challenges? This replaces current records.'))return;seedSample(true);}
+function clearAll(){if(!confirm('Clear ALL records (reports, challenges, achievements, initiatives)?'))return;
+  reports=[];challenges=[];achievements=[];initiatives=[];saveRep();saveCh();saveAch();saveInit();Store.set('dcas_seeded','1');renderAll();toast('All records cleared');}
+
+/* ---------- shared ---------- */
+function openSheet(t,h){$('#sheetTitle').textContent=t;$('#sheetBody').innerHTML=h;$('#scrim').classList.add('open');$('#sheet').classList.add('open');}
+function closeSheet(){$('#scrim').classList.remove('open');$('#sheet').classList.remove('open');}
+function det(k,v){return `<div class="det-row"><div class="k">${k}</div><div class="v">${v}</div></div>`;}
+function emptyState(t){return `<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><p>${t}</p></div>`;}
+function renderAll(){renderDashboard();}
+
+/* ---------- restore uploaded roster if present ---------- */
+try{const rj=Store.get('dcas_roster');if(rj){const o=JSON.parse(rj);if(o.staff&&o.staff.length){ROSTER.staff=o.staff;STAFF=o.staff;if(o.teams)ROSTER.teams=o.teams;}}}catch(e){}
+
+/* ---------- PWA ---------- */
+try{const m={name:'[ORG] Airport Operations',short_name:'[ORG] Ops',start_url:'.',display:'standalone',background_color:'#F4F6F9',theme_color:'#A30C24',
+  icons:[{src:'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 192 192%22%3E%3Crect width=%22192%22 height=%22192%22 rx=%2240%22 fill=%22%23C8102E%22/%3E%3Cpath d=%22M30 96h28l16-40 32 96 16-56h40%22 fill=%22none%22 stroke=%22white%22 stroke-width=%2210%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E',sizes:'192x192',type:'image/svg+xml'}]};
+  const l=document.createElement('link');l.rel='manifest';l.href=URL.createObjectURL(new Blob([JSON.stringify(m)],{type:'application/manifest+json'}));document.head.appendChild(l);}catch(e){}
+
+renderDashboard();
+</script>
+</body>
+</html>
