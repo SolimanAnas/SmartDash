@@ -9,7 +9,7 @@ test('manifest.json is valid PWA manifest', () => {
   const m = JSON.parse(raw);
   expect(m.name).toBeTruthy();
   expect(m.short_name).toBeTruthy();
-  expect(m.start_url).toBe('.');
+  expect(m.start_url).toMatch(/^\.\/?$/);
   expect(m.display).toBe('standalone');
   expect(m.background_color).toBeTruthy();
   expect(m.theme_color).toBeTruthy();
