@@ -1,0 +1,696 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#A30C24" />
+    <title>DCAS Airport Operations Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+      /*CSS*/
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="strip"></div>
+      <div class="tb-inner">
+        <div class="logo">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#fff"
+            stroke-width="2.1"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M3 12h4l2-5 4 12 2-7h6" />
+          </svg>
+        </div>
+        <div class="tb-titles">
+          <h1>Airport Operations</h1>
+          <p>DUBAI CORPORATION FOR AMBULANCE SERVICES</p>
+        </div>
+        <button class="iconbtn" data-act="go" data-v="more">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          >
+            <circle cx="5" cy="12" r="1.6" />
+            <circle cx="12" cy="12" r="1.6" />
+            <circle cx="19" cy="12" r="1.6" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <main id="view-dashboard" class="view active">
+      <div class="daysel">
+        <button class="nav-d" data-act="step" data-n="-1">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+          >
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+        </button>
+        <div class="center">
+          <div class="d" id="dsDate"></div>
+          <div class="wd" id="dsWd"></div>
+        </div>
+        <button class="today-b" id="dsToday" data-act="today">Today</button>
+        <button class="nav-d" data-act="step" data-n="1">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+          >
+            <path d="M9 18l6-6-6-6" />
+          </svg>
+        </button>
+      </div>
+      <div class="liveband" id="liveband"></div>
+      <div class="sec-h">
+        <h2 style="font-size: 16px">Management overview</h2>
+        <span class="sub" id="repMonthLbl"></span>
+      </div>
+      <div class="kpi-grid" id="mgmtKpis"></div>
+      <div class="card">
+        <div class="card-h">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 3v18h18" />
+            <path d="M7 14l4-4 3 3 5-6" /></svg
+          >Response time trend<span class="more-l" data-act="go" data-v="analytics"
+            >Analytics &rarr;</span
+          >
+        </div>
+        <div id="dashSpark"></div>
+      </div>
+      <div class="card">
+        <div class="card-h">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          >
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></svg
+          >Coverage now<span class="more-l" data-act="go" data-v="command"
+            >Command Center &rarr;</span
+          >
+        </div>
+        <div id="dashCoverage"></div>
+      </div>
+    </main>
+
+    <main id="view-command" class="view">
+      <div class="sec-h">
+        <h2>Command Center</h2>
+        <span class="sub" id="cmdDayLbl"></span>
+      </div>
+      <div class="daysel">
+        <button class="nav-d" data-act="step" data-n="-1">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+          >
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+        </button>
+        <div class="center">
+          <div class="d" id="cmdDate"></div>
+          <div class="wd" id="cmdWd"></div>
+        </div>
+        <button class="today-b" id="cmdToday" data-act="today">Today</button>
+        <button class="nav-d" data-act="step" data-n="1">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+          >
+            <path d="M9 18l6-6-6-6" />
+          </svg>
+        </button>
+      </div>
+      <div class="card">
+        <div class="card-h">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7" rx="1" />
+            <rect x="14" y="3" width="7" height="7" rx="1" />
+            <rect x="3" y="14" width="7" height="7" rx="1" />
+            <rect x="14" y="14" width="7" height="7" rx="1" /></svg
+          >Terminal status map
+        </div>
+        <div class="map" id="termMap"></div>
+      </div>
+      <div class="card">
+        <div class="card-h">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 11l3 3L22 4" />
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg
+          >Coverage by terminal
+        </div>
+        <div id="cmdCoverage"></div>
+      </div>
+    </main>
+
+    <main id="view-roster" class="view">
+      <div class="sec-h">
+        <h2>Roster</h2>
+        <span class="sub" id="rosMonth"></span>
+      </div>
+      <div class="legend">
+        <span><i class="lg-dot" style="background: var(--day)"></i>Day</span
+        ><span><i class="lg-dot" style="background: var(--night)"></i>Night</span>
+        <span><i class="lg-dot" style="background: var(--off)"></i>Off</span
+        ><span><i class="lg-dot" style="background: var(--leave)"></i>Leave</span>
+      </div>
+      <div class="card">
+        <div class="card-h">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" />
+            <path d="M3 10h18M8 2v4M16 2v4" /></svg
+          >Team rotation &mdash; 4 platoons
+        </div>
+        <div class="strip-wrap" id="strips"></div>
+        <p style="font-size: 11.5px; color: var(--muted); margin: 12px 2px 0">
+          Tap any day to inspect coverage. Teams A &middot; B &middot; C &middot; D rotate Day /
+          Night / Off.
+        </p>
+      </div>
+      <div class="card">
+        <div class="card-h">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          >
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" /></svg
+          >On duty &mdash; <span id="rosDay" style="text-transform: none; margin-left: 4px"></span>
+        </div>
+        <div id="rosDuty"></div>
+      </div>
+    </main>
+
+    <main id="view-challenges" class="view">
+      <div class="sec-h">
+        <h2>Challenges</h2>
+        <span class="sub" id="chCount"></span>
+      </div>
+      <div class="kpi-grid" id="chStats" style="grid-template-columns: repeat(3, 1fr)"></div>
+      <div class="searchbar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="7" />
+          <path d="m21 21-4.3-4.3" /></svg
+        ><input id="chSearch" placeholder="Search challenges&hellip;" />
+      </div>
+      <div class="chips" id="chChips"></div>
+      <div id="chList"></div>
+    </main>
+
+    <main id="view-more" class="view">
+      <div class="sec-h"><h2>More</h2></div>
+      <div class="menu-label">Operations</div>
+      <button class="menu-item" data-act="go" data-v="staff">
+        <div class="mi-ic" style="background: var(--blue-soft); color: var(--blue)">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          >
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+          </svg>
+        </div>
+        <div>
+          <div class="mi-t">Staff Directory</div>
+          <div class="mi-d">126 staff &middot; profiles &amp; portfolios</div>
+        </div>
+        <span class="chev">&rsaquo;</span>
+      </button>
+      <button class="menu-item" data-act="go" data-v="reports">
+        <div class="mi-ic" style="background: var(--green-soft); color: var(--green)">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          >
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <path d="M14 2v6h6M8 13h8M8 17h8" />
+          </svg>
+        </div>
+        <div>
+          <div class="mi-t">Monthly Reports</div>
+          <div class="mi-d">Cases, response time, ROSC</div>
+        </div>
+        <span class="chev">&rsaquo;</span>
+      </button>
+      <button class="menu-item" data-act="go" data-v="analytics">
+        <div class="mi-ic" style="background: var(--red-soft); color: var(--red-d)">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          >
+            <path d="M3 3v18h18" />
+            <path d="M7 14l4-4 3 3 5-6" />
+          </svg>
+        </div>
+        <div>
+          <div class="mi-t">Analytics</div>
+          <div class="mi-d">KPI trends &amp; distributions</div>
+        </div>
+        <span class="chev">&rsaquo;</span>
+      </button>
+      <div class="menu-label">Records</div>
+      <button class="menu-item" data-act="go" data-v="achievements">
+        <div class="mi-ic" style="background: var(--gold-soft); color: var(--gold)">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="12" cy="8" r="5" />
+            <path d="M8.2 12.5 7 22l5-3 5 3-1.2-9.5" />
+          </svg>
+        </div>
+        <div>
+          <div class="mi-t">Achievements</div>
+          <div class="mi-d">Recognition &amp; commendations</div>
+        </div>
+        <span class="chev">&rsaquo;</span>
+      </button>
+      <button class="menu-item" data-act="go" data-v="initiatives">
+        <div class="mi-ic" style="background: var(--night-soft); color: var(--night)">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M9 11l3 3L22 4" />
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+          </svg>
+        </div>
+        <div>
+          <div class="mi-t">Initiatives</div>
+          <div class="mi-d">Digital transformation projects</div>
+        </div>
+        <span class="chev">&rsaquo;</span>
+      </button>
+      <div class="menu-label">Admin</div>
+      <button class="menu-item" data-act="go" data-v="upload">
+        <div class="mi-ic" style="background: var(--amber-soft); color: var(--amber)">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <path d="M17 8l-5-5-5 5M12 3v12" />
+          </svg>
+        </div>
+        <div>
+          <div class="mi-t">Upload Center</div>
+          <div class="mi-d">Excel import &mdash; roster, reports</div>
+        </div>
+        <span class="chev">&rsaquo;</span>
+      </button>
+      <button class="menu-item" data-act="go" data-v="settings">
+        <div class="mi-ic" style="background: var(--off-soft); color: var(--ink2)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 0 1-4 0v-.1A1.6 1.6 0 0 0 7 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H1a2 2 0 0 1 0-4h.1A1.6 1.6 0 0 0 4.6 7a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 2.7-1.1V1a2 2 0 0 1 4 0v.1A1.6 1.6 0 0 0 17 4.6a1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.7H23a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"
+            />
+          </svg>
+        </div>
+        <div>
+          <div class="mi-t">Settings &amp; Roadmap</div>
+          <div class="mi-d">Backup &middot; future enhancements</div>
+        </div>
+        <span class="chev">&rsaquo;</span>
+      </button>
+    </main>
+
+    <main id="view-staff" class="view">
+      <button class="back" data-act="go" data-v="more">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M15 18l-6-6 6-6" /></svg
+        >More
+      </button>
+      <div class="sec-h">
+        <h2>Staff Directory</h2>
+        <span class="sub" id="stfCount"></span>
+      </div>
+      <div class="searchbar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="7" />
+          <path d="m21 21-4.3-4.3" /></svg
+        ><input id="stfSearch" placeholder="Search name, ID, station, phone&hellip;" />
+      </div>
+      <div class="chips" id="stfChips"></div>
+      <div id="stfList"></div>
+    </main>
+
+    <main id="view-reports" class="view">
+      <button class="back" data-act="go" data-v="more">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M15 18l-6-6 6-6" /></svg
+        >More
+      </button>
+      <div class="sec-h">
+        <h2>Monthly Reports</h2>
+        <span class="sub" id="repCount"></span>
+      </div>
+      <div class="btn-row" style="margin-bottom: 14px">
+        <button class="btn btn-ghost" data-act="go" data-v="upload">Upload Excel</button
+        ><button class="btn btn-primary" data-act="rep-new">Add manually</button>
+      </div>
+      <div id="repList"></div>
+    </main>
+
+    <main id="view-analytics" class="view">
+      <button class="back" data-act="go" data-v="more">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M15 18l-6-6 6-6" /></svg
+        >More
+      </button>
+      <div class="sec-h"><h2>Analytics</h2></div>
+      <div id="analytics"></div>
+    </main>
+
+    <main id="view-achievements" class="view">
+      <button class="back" data-act="go" data-v="more">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M15 18l-6-6 6-6" /></svg
+        >More
+      </button>
+      <div class="sec-h">
+        <h2>Achievements</h2>
+        <span class="sub" id="achCount"></span>
+      </div>
+      <div class="searchbar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="7" />
+          <path d="m21 21-4.3-4.3" /></svg
+        ><input id="achSearch" placeholder="Search name or achievement&hellip;" />
+      </div>
+      <div class="chips" id="achChips"></div>
+      <div id="achList"></div>
+    </main>
+
+    <main id="view-initiatives" class="view">
+      <button class="back" data-act="go" data-v="more">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M15 18l-6-6 6-6" /></svg
+        >More
+      </button>
+      <div class="sec-h">
+        <h2>Initiatives</h2>
+        <span class="sub" id="initCount"></span>
+      </div>
+      <div class="searchbar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="7" />
+          <path d="m21 21-4.3-4.3" /></svg
+        ><input id="initSearch" placeholder="Search initiatives&hellip;" />
+      </div>
+      <div class="chips" id="initChips"></div>
+      <div id="initList"></div>
+    </main>
+
+    <main id="view-upload" class="view">
+      <button class="back" data-act="go" data-v="more">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M15 18l-6-6 6-6" /></svg
+        >More
+      </button>
+      <div class="sec-h"><h2>Upload Center</h2></div>
+      <p style="font-size: 13px; color: var(--ink2); margin: 0 2px 14px; line-height: 1.6">
+        Drop an Excel file or tap a card. Everything stays on this device. Need the format? Download
+        a template first.
+      </p>
+      <div id="dropRoster" class="drop" data-act="pick" data-kind="roster"></div>
+      <div id="dropReport" class="drop" data-act="pick" data-kind="report"></div>
+      <div id="dropAch" class="drop" data-act="pick" data-kind="ach"></div>
+      <input type="file" id="fileIn" accept=".xlsx,.xls" style="display: none" />
+    </main>
+
+    <main id="view-settings" class="view">
+      <button class="back" data-act="go" data-v="more">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M15 18l-6-6 6-6" /></svg
+        >More
+      </button>
+      <div class="sec-h"><h2>Settings</h2></div>
+      <div class="menu-label">Data</div>
+      <button class="menu-item" data-act="export-all">
+        <div class="mi-ic" style="background: var(--green-soft); color: var(--green)">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          >
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <path d="M14 2v6h6" />
+          </svg>
+        </div>
+        <div>
+          <div class="mi-t">Export everything (Excel)</div>
+          <div class="mi-d">Challenges &middot; reports &middot; records</div>
+        </div>
+      </button>
+      <button class="menu-item" data-act="reset-sample">
+        <div class="mi-ic" style="background: var(--amber-soft); color: var(--amber)">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          >
+            <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16" />
+          </svg>
+        </div>
+        <div>
+          <div class="mi-t">Reset sample data</div>
+          <div class="mi-d">Reload demo reports &amp; challenges</div>
+        </div>
+      </button>
+      <button class="menu-item" data-act="clear-all">
+        <div class="mi-ic" style="background: var(--red-soft); color: var(--red-d)">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          >
+            <path
+              d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"
+            />
+          </svg>
+        </div>
+        <div>
+          <div class="mi-t">Clear all records</div>
+          <div class="mi-d">Cannot be undone</div>
+        </div>
+      </button>
+      <div class="menu-label">Future enhancements</div>
+      <div class="road">
+        <h3>Digital transformation roadmap</h3>
+        <p>Planned integrations beyond this platform.</p>
+        <div class="road-item">
+          <div class="ri">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2">
+              <path d="M3 3v18h18" />
+              <path d="M7 14l4-4 3 3 5-6" />
+            </svg>
+          </div>
+          <div class="rt">Power BI integration</div>
+          <div class="rb">Phase 2</div>
+        </div>
+        <div class="road-item">
+          <div class="ri">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2">
+              <path
+                d="M12 2a4 4 0 0 1 4 4 4 4 0 0 1 0 8 4 4 0 0 1-8 0 4 4 0 0 1 0-8 4 4 0 0 1 4-4z"
+              />
+            </svg>
+          </div>
+          <div class="rt">Backend sync &amp; multi-user</div>
+          <div class="rb">Phase 2</div>
+        </div>
+        <div class="road-item">
+          <div class="ri">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2">
+              <path d="M12 20v-6M6 20v-3M18 20v-9M4 4l16 6" />
+            </svg>
+          </div>
+          <div class="rt">Predictive analytics</div>
+          <div class="rb">Phase 3</div>
+        </div>
+        <div class="road-item">
+          <div class="ri">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2">
+              <path d="M4 4h16v16H4z" />
+              <path d="M4 9h16M9 9v11" />
+            </svg>
+          </div>
+          <div class="rt">Automated reporting</div>
+          <div class="rb">Phase 2</div>
+        </div>
+      </div>
+      <p style="font-size: 11.5px; color: var(--muted); text-align: center; line-height: 1.7">
+        Roster source: Airport schedule &mdash; June 2026 (Teams A&ndash;D). Excel engine:
+        <span id="xlsxState" class="mono"></span>
+      </p>
+    </main>
+
+    <button class="fab" id="fab" data-act="fab">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.4"
+        stroke-linecap="round"
+      >
+        <path d="M12 5v14M5 12h14" />
+      </svg>
+    </button>
+
+    <nav class="nav">
+      <button class="active" data-v="dashboard" data-act="go">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M3 13h8V3H3zM13 21h8V11h-8zM13 3v6h8V3zM3 21h8v-6H3z" /></svg
+        ><span>Dashboard</span>
+      </button>
+      <button data-v="command" data-act="go">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <rect x="3" y="3" width="7" height="7" rx="1" />
+          <rect x="14" y="3" width="7" height="7" rx="1" />
+          <rect x="3" y="14" width="7" height="7" rx="1" />
+          <rect x="14" y="14" width="7" height="7" rx="1" /></svg
+        ><span>Command</span>
+      </button>
+      <button data-v="roster" data-act="go">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <rect x="3" y="4" width="18" height="18" rx="2" />
+          <path d="M3 10h18M8 2v4M16 2v4" /></svg
+        ><span>Roster</span>
+      </button>
+      <button data-v="challenges" data-act="go">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+          <path d="M12 9v4M12 17h.01" /></svg
+        ><span>Challenges</span>
+      </button>
+      <button data-v="more" data-act="go">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+        >
+          <circle cx="5" cy="12" r="1.6" />
+          <circle cx="12" cy="12" r="1.6" />
+          <circle cx="19" cy="12" r="1.6" /></svg
+        ><span>More</span>
+      </button>
+    </nav>
+
+    <div class="scrim" id="scrim" data-act="close"></div>
+    <div class="sheet" id="sheet">
+      <div class="grab"></div>
+      <div class="sheet-head">
+        <h3 id="sheetTitle"></h3>
+        <button class="iconbtn" data-act="close">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          >
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div class="sheet-body" id="sheetBody"></div>
+    </div>
+    <div class="toast" id="toast"></div>
+
+    <script>
+      /*BUNDLE*/
+    </script>
+  </body>
+</html>
