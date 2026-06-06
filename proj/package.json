@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "DCAS Airport Operations Platform - modular source, single-file build",
+  "description": "SmartDash - Airport ambulance operations dashboard for DCAS",
   "scripts": {
     "icons": "node scripts/generate-icons.mjs",
     "build": "npm run icons && node build.mjs",

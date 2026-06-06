@@ -5,8 +5,8 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('page loads with correct title and branding', async ({ page }) => {
-  await expect(page).toHaveTitle(/DCAS Airport Operations/);
-  await expect(page.getByRole('heading', { name: 'Airport Operations' })).toBeVisible();
+  await expect(page).toHaveTitle(/SmartDash/);
+  await expect(page.getByRole('heading', { name: 'SmartDash' })).toBeVisible();
   await expect(page.locator('text=DUBAI CORPORATION FOR AMBULANCE SERVICES')).toBeVisible();
 });
 

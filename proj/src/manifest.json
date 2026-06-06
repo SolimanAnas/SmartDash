@@ -1,6 +1,6 @@
 {
-  "name": "DCAS Airport Operations Platform",
-  "short_name": "DCAS Ops",
+  "name": "SmartDash",
+  "short_name": "SmartDash",
   "description": "Airport ambulance operations dashboard for Dubai Corporation for Ambulance Services",
   "start_url": ".",
   "display": "standalone",

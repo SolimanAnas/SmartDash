@@ -1,4 +1,4 @@
-const CACHE = 'dcas-ops-v3';
+const CACHE = 'smartdash-v4';
 const PRECACHE = [
   'manifest.json',
   '404.html',
@@ -12,8 +12,15 @@ const PRECACHE = [
   'icons/icon-384x384.png',
   'icons/icon-512x512.png',
 ];
-const CDN_CACHE = 'dcas-ops-cdn-v3';
-const OLD_CACHES = ['dcas-ops-v1', 'dcas-ops-v2', 'dcas-ops-cdn-v1', 'dcas-ops-cdn-v2'];
+const CDN_CACHE = 'smartdash-cdn-v4';
+const OLD_CACHES = [
+  'dcas-ops-v1',
+  'dcas-ops-v2',
+  'dcas-ops-v3',
+  'dcas-ops-cdn-v1',
+  'dcas-ops-cdn-v2',
+  'dcas-ops-cdn-v3',
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
