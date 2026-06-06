@@ -22,4 +22,5 @@ html = html.replace('/*CSS*/', () => css);
 html = html.replace('/*BUNDLE*/', () => js);
 fs.mkdirSync('dist', { recursive: true });
 fs.writeFileSync('dist/dcas-airport-platform.html', html);
+fs.writeFileSync('../index.html', html);
 console.log('Built dist/dcas-airport-platform.html', html.length, 'bytes  (js', js.length, 'bytes  css', css.length, 'bytes)');

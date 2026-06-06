@@ -46,10 +46,18 @@ let challenges = JSON.parse(Store.get('dcas_ch') || '[]');
 let reports = JSON.parse(Store.get('dcas_rep') || '[]');
 let achievements = JSON.parse(Store.get('dcas_ach') || '[]');
 let initiatives = JSON.parse(Store.get('dcas_init') || '[]');
+let certifications = JSON.parse(Store.get('dcas_cert') || '[]');
 const saveCh = () => Store.set('dcas_ch', JSON.stringify(challenges));
 const saveRep = () => Store.set('dcas_rep', JSON.stringify(reports));
 const saveAch = () => Store.set('dcas_ach', JSON.stringify(achievements));
 const saveInit = () => Store.set('dcas_init', JSON.stringify(initiatives));
+const saveCert = () => Store.set('dcas_cert', JSON.stringify(certifications));
+const certExpiryDays = (d) =>
+  d ? Math.ceil((new Date(d + 'T23:59') - Date.now()) / 86400000) : -Infinity;
+const certStatus = (d) => {
+  const n = certExpiryDays(d);
+  return n < 0 ? 'expired' : n < 90 ? 'soon' : 'valid';
+};
 
 function seedSample(force) {
   reports = [
@@ -180,6 +188,45 @@ function seedSample(force) {
       createdAt: Date.now(),
     },
   ];
+  certifications = [
+    {
+      staffId: '2238',
+      staffTeam: 'A',
+      certs: {
+        bls: '2027-06-01',
+        acls: '2026-12-15',
+        pals: '2026-09-01',
+        phtls: '2027-03-01',
+        driving: '2027-05-01',
+        airport: '2026-08-15',
+      },
+    },
+    {
+      staffId: '756',
+      staffTeam: 'A',
+      certs: {
+        bls: '2026-07-01',
+        acls: '2026-06-01',
+        pals: '2026-11-01',
+        phtls: '2027-02-01',
+        driving: '2026-12-01',
+        airport: '2026-09-01',
+      },
+    },
+    {
+      staffId: '1293',
+      staffTeam: 'B',
+      certs: {
+        bls: '2026-08-01',
+        acls: '2026-10-01',
+        pals: '2027-04-01',
+        phtls: '2026-07-01',
+        driving: '2027-06-01',
+        airport: '2026-11-01',
+      },
+    },
+  ];
+  saveCert();
   saveRep();
   saveCh();
   saveInit();
@@ -377,6 +424,36 @@ function renderDashboard() {
     '">' +
     openIssues +
     '</div><div class="l">Open issues</div></div>';
+  const expiredCerts = [],
+    soonCerts = [];
+  certifications.forEach((record) => {
+    if (!record.certs) return;
+    Object.entries(record.certs).forEach(([_k, d]) => {
+      const s = certStatus(d);
+      if (s === 'expired') expiredCerts.push(record.staffId);
+      else if (s === 'soon') soonCerts.push(record.staffId);
+    });
+  });
+  const uniqueExpired = [...new Set(expiredCerts)].length;
+  const uniqueSoon = [...new Set(soonCerts)].length;
+  if (uniqueExpired || uniqueSoon) {
+    const band = $('#liveband');
+    const html = band.innerHTML;
+    band.innerHTML =
+      html +
+      '<div style="grid-column:1/-1;background:linear-gradient(160deg,#1b2735,#15202B);color:#fff;padding:12px 14px;display:flex;align-items:center;gap:12px;cursor:pointer" data-act="go" data-v="staff">' +
+      (uniqueExpired
+        ? '<span style="display:inline-flex;align-items:center;gap:6px;background:var(--red-soft);color:var(--red-d);padding:5px 11px;border-radius:9px;font-size:12px;font-weight:700">' +
+          uniqueExpired +
+          ' expired</span>'
+        : '') +
+      (uniqueSoon
+        ? '<span style="display:inline-flex;align-items:center;gap:6px;background:var(--amber-soft);color:var(--amber);padding:5px 11px;border-radius:9px;font-size:12px;font-weight:700">' +
+          uniqueSoon +
+          ' expiring soon</span>'
+        : '') +
+      '<span style="font-size:12px;font-weight:600;opacity:.85">Certifications &rarr;</span></div>';
+  }
   const r = latestReport(),
     p = prevReport();
   $('#repMonthLbl').textContent = r ? mLabel(r.month) : 'no reports yet';
@@ -788,6 +865,36 @@ function renderStaff() {
         .join('')
     : emptyState('No staff match');
 }
+const getStaffCerts = (id, team) =>
+  certifications.filter((c) => c.staffId === id && c.staffTeam === team)[0] ||
+  certifications.filter((c) => c.staffId === id)[0];
+const certBadge = (label, key, data) => {
+  const d = data ? data[key] : null;
+  const s = d ? certStatus(d) : null;
+  const days = d ? certExpiryDays(d) : 0;
+  const color =
+    s === 'expired'
+      ? ['var(--red-soft)', 'var(--red-d)']
+      : s === 'soon'
+        ? ['var(--amber-soft)', 'var(--amber)']
+        : ['var(--green-soft)', 'var(--green)'];
+  return (
+    '<span style="display:inline-flex;align-items:center;gap:6px;background:' +
+    color[0] +
+    ';color:' +
+    color[1] +
+    ';padding:4px 9px;border-radius:8px;font-size:12px;font-weight:600;margin:3px 3px 0 0">' +
+    esc(label) +
+    ' ' +
+    (d ? fmtD(d) : '<span style="opacity:.5">—</span>') +
+    (s === 'expired'
+      ? ' <span style="font-size:10px">EXPIRED</span>'
+      : s === 'soon'
+        ? ' <span style="font-size:10px">(' + days + 'd)</span>'
+        : '') +
+    '</span>'
+  );
+};
 function viewStaff(id, team) {
   const s =
     STAFF.filter((x) => x.id === id && x.team === team)[0] || STAFF.filter((x) => x.id === id)[0];
@@ -882,6 +989,7 @@ function viewStaff(id, team) {
               .join('')
           : '<span style="color:var(--muted)">None</span>',
       ) +
+      det('Certifications', certSection(s)) +
       det('Shift schedule \u2014 June 2026', miniCal(s)),
   );
 }
@@ -902,6 +1010,91 @@ function miniCal(s) {
   return h + '</div>';
 }
 
+function certSection(s) {
+  const data = getStaffCerts(s.id, s.team);
+  const keys = {
+    bls: 'BLS',
+    acls: 'ACLS',
+    pals: 'PALS',
+    phtls: 'PHTLS',
+    driving: 'Driving Permit',
+    airport: 'Airport Permit',
+  };
+  const certs = data && data.certs ? data.certs : {};
+  const h = Object.entries(keys)
+    .map(([k, label]) => certBadge(label, k, certs))
+    .join('');
+  return (
+    '<div style="margin-bottom:8px">' +
+    h +
+    '</div>' +
+    '<button class="btn btn-ghost" data-act="stf-cert" data-id="' +
+    esc(s.id) +
+    '" data-team="' +
+    esc(s.team) +
+    '">Update certifications</button>'
+  );
+}
+function editStfCerts(id, team) {
+  const s =
+    STAFF.filter((x) => x.id === id && x.team === team)[0] || STAFF.filter((x) => x.id === id)[0];
+  if (!s) return;
+  let data = getStaffCerts(id, team);
+  if (!data) {
+    data = { staffId: id, staffTeam: team, certs: {} };
+    certifications.push(data);
+  }
+  const keys = {
+    bls: 'BLS',
+    acls: 'ACLS',
+    pals: 'PALS',
+    phtls: 'PHTLS',
+    driving: 'Driving Permit',
+    airport: 'Airport Permit',
+  };
+  const c = data.certs || {};
+  const fields = Object.entries(keys)
+    .map(
+      ([k, label]) =>
+        '<div class="field" style="flex:1;min-width:120px"><label>' +
+        label +
+        '</label><input id="cert-' +
+        k +
+        '" type="date" value="' +
+        esc(c[k] || '') +
+        '"></div>',
+    )
+    .join('');
+  openSheet(
+    'Certifications \u2014 ' + dispName(s.name),
+    '<div class="field-row" style="flex-wrap:wrap">' +
+      fields +
+      '</div>' +
+      '<p style="font-size:12px;color:var(--muted);margin:6px 0 14px">Leave blank for certifications the staff member does not hold.</p>' +
+      '<button class="btn btn-primary" data-act="stf-cert-save" data-id="' +
+      esc(id) +
+      '" data-team="' +
+      esc(team) +
+      '">Save certifications</button>',
+  );
+}
+function saveStfCerts(id, team) {
+  const keys = ['bls', 'acls', 'pals', 'phtls', 'driving', 'airport'];
+  const certs = {};
+  keys.forEach((k) => {
+    const v = $('#cert-' + k).value;
+    if (v) certs[k] = v;
+  });
+  let data = getStaffCerts(id, team);
+  if (data) data.certs = certs;
+  else {
+    certifications.push({ staffId: id, staffTeam: team, certs: certs });
+  }
+  saveCert();
+  closeSheet();
+  viewStaff(id, team);
+  toast('Certifications saved');
+}
 /* ===== challenges ===== */
 const PRIOS = ['Low', 'Medium', 'High', 'Critical'],
   CH_STATUS = ['Open', 'In progress', 'Resolved'],
@@ -1998,11 +2191,31 @@ function exportAllExcel() {
       Completed: i.completedDate,
       Impact: i.impact,
     })),
+    Certifications: certifications.flatMap((r) => {
+      const s =
+        STAFF.filter((x) => x.id === r.staffId && x.team === r.staffTeam)[0] ||
+        STAFF.filter((x) => x.id === r.staffId)[0];
+      return Object.entries(r.certs || {}).map(([k, d]) => ({
+        Name: s ? dispName(s.name) : r.staffId,
+        'Staff ID': r.staffId,
+        Certification:
+          {
+            bls: 'BLS',
+            acls: 'ACLS',
+            pals: 'PALS',
+            phtls: 'PHTLS',
+            driving: 'Driving Permit',
+            airport: 'Airport Permit',
+          }[k] || k,
+        'Expiry Date': d,
+        Status: certStatus(d),
+      }));
+    }),
   });
   toast('Exported to Excel');
 }
 function resetSample() {
-  if (!confirm('Reload demo reports & challenges? This replaces current records.')) return;
+  if (!confirm('Reload demo data? This replaces current records.')) return;
   seedSample(true);
 }
 function clearAll() {
@@ -2011,10 +2224,12 @@ function clearAll() {
   challenges = [];
   achievements = [];
   initiatives = [];
+  certifications = [];
   saveRep();
   saveCh();
   saveAch();
   saveInit();
+  saveCert();
   Store.set('dcas_seeded', '1');
   go('dashboard');
   toast('All records cleared');
@@ -2092,6 +2307,8 @@ const ACTIONS = {
     stfFilter = a.key;
     renderStaff();
   },
+  'stf-cert': (a) => editStfCerts(a.id, a.team),
+  'stf-cert-save': (a) => saveStfCerts(a.id, a.team),
 };
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-act]');

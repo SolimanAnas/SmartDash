@@ -10,4 +10,4 @@ echo === Build ===
 call npm run build
 echo.
 cd /d "%~dp0"
-start "" "proj\dist\dcas-airport-platform.html"
+start "" "index.html"
