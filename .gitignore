@@ -3,3 +3,5 @@ dist/
 *.zip
 playwright-report/
 test-results/
+proj/src/icons/
+/icons/

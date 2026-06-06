@@ -21,6 +21,6 @@ export default [
     },
   },
   {
-    ignores: ['dist/*'],
+    ignores: ['dist/*', 'tests/*', 'playwright.config.js'],
   },
 ];

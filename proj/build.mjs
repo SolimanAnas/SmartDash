@@ -30,4 +30,12 @@ fs.writeFileSync('../index.html', html);
     fs.copyFileSync('src/' + f, '../' + f);
   }
 });
+if (fs.existsSync('src/icons')) {
+  ['dist/icons', '../icons'].forEach((d) => {
+    fs.mkdirSync(d, { recursive: true });
+    fs.readdirSync('src/icons').forEach((f) => {
+      fs.copyFileSync('src/icons/' + f, d + '/' + f);
+    });
+  });
+}
 console.log('Built dist/dcas-airport-platform.html', html.length, 'bytes  (js', js.length, 'bytes  css', css.length, 'bytes)');
