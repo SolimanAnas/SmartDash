@@ -9,7 +9,7 @@ const OUT = resolve(ROOT, 'src', 'icons');
 
 mkdirSync(OUT, { recursive: true });
 
-const sizes = [48, 72, 96, 128, 144, 152, 192, 384, 512];
+const sizes = [16, 32, 48, 72, 96, 128, 144, 152, 192, 256, 384, 512];
 
 const results = await Promise.all(
   sizes.map(async (size) => {
