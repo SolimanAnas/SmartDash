@@ -1,6 +1,5 @@
-const CACHE = 'dcas-ops-v1';
+const CACHE = 'dcas-ops-v2';
 const PRECACHE = [
-  'index.html',
   'manifest.json',
   '404.html',
   'icons/icon-48x48.png',
@@ -13,7 +12,7 @@ const PRECACHE = [
   'icons/icon-384x384.png',
   'icons/icon-512x512.png',
 ];
-const CDN_CACHE = 'dcas-ops-cdn-v1';
+const CDN_CACHE = 'dcas-ops-cdn-v2';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -39,6 +38,7 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
+  const isNav = event.request.mode === 'navigate';
 
   if (
     url.hostname === 'cdnjs.cloudflare.com' ||
@@ -58,6 +58,28 @@ self.addEventListener('fetch', (event) => {
           return res;
         } catch {
           return cached || new Response('', { status: 408 });
+        }
+      })(),
+    );
+    return;
+  }
+
+  if (isNav) {
+    event.respondWith(
+      (async () => {
+        try {
+          const res = await fetch(event.request);
+          if (res.ok) {
+            const cache = await caches.open(CACHE);
+            cache.put(event.request, res.clone());
+          }
+          return res;
+        } catch {
+          const cached = await caches.match(event.request);
+          if (cached) return cached;
+          const fallback = await caches.match('404.html');
+          if (fallback) return fallback;
+          return new Response('Offline', { status: 503 });
         }
       })(),
     );
