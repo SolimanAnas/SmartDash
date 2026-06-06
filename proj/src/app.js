@@ -370,6 +370,14 @@ function terminalCoverage(d) {
     };
   });
 }
+function singleMedicUnits(d) {
+  return stationsList()
+    .map((s) => {
+      const on = s.crew.filter((c) => isDuty(shiftOn(c, d)));
+      return { ...s, onDuty: on, count: on.length };
+    })
+    .filter((s) => s.count === 1);
+}
 function teamCode(t, d) {
   const c = {};
   STAFF.filter((s) => s.team === t).forEach((s) => {
@@ -629,12 +637,10 @@ function renderCommand() {
         '<div><span class="zbadge">' +
         badge +
         '</span><div class="zmeta" style="margin-top:8px">' +
-        c.covered +
-        '/' +
         c.stations +
-        ' \u00b7 ' +
+        ' Units \u00b7 ' +
         c.headcount +
-        ' medics</div></div></div>'
+        ' Medics</div></div></div>'
       );
     })
     .join('');
@@ -655,17 +661,11 @@ function renderCommand() {
         '">' +
         '<div class="cov-name"><div class="t">' +
         esc(c.label) +
-        '</div><div class="s">Expected ' +
+        '</div><div class="s">' +
         c.stations +
-        ' \u00b7 Actual ' +
+        ' Units \u00b7 ' +
         c.headcount +
-        ' on duty</div></div>' +
-        '<span class="cov-var" style="color:' +
-        (variance >= 0 ? 'var(--green)' : 'var(--red)') +
-        '">' +
-        (variance >= 0 ? '+' : '') +
-        variance +
-        '</span>' +
+        ' Medics on duty</div></div>' +
         '<span class="status-pill ' +
         sp[0] +
         '" style="margin-left:10px"><span class="d"></span>' +
@@ -674,6 +674,32 @@ function renderCommand() {
       );
     })
     .join('');
+  const sm = singleMedicUnits(day);
+  const smCard = $('#singleMedicCard');
+  smCard.style.display = sm.length ? '' : 'none';
+  $('#cmdSingleMedic').innerHTML = sm.length
+    ? sm
+        .map(
+          (s, i) =>
+            '<div class="smu-row" style="animation-delay:' +
+            i * 0.05 +
+            's">' +
+            '<span class="callsign smu-cs">' +
+            esc(s.callsign) +
+            '</span>' +
+            '<div class="smu-info">' +
+            '<div class="smu-name">' +
+            esc(dispName(s.onDuty[0].name)) +
+            '</div>' +
+            '<div class="smu-meta">' +
+            esc(s.area || s.terminal || s.airport) +
+            ' \u00b7 ' +
+            CODES[shiftOn(s.onDuty[0], day)].l +
+            '</div></div>' +
+            '<div class="smu-alert">1 medic</div></div>',
+        )
+        .join('')
+    : '';
 }
 function viewTerminal(ap, term) {
   const sts = stationsList().filter((s) => s.airport === ap && (term ? normTerm(s.terminal) === normTerm(term) : true));
