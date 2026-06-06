@@ -2351,29 +2351,27 @@ try {
   }
 } catch (e) {}
 
-/* PWA manifest */
-try {
-  const m = {
-    name: 'DCAS Airport Operations',
-    short_name: 'DCAS Ops',
-    start_url: '.',
-    display: 'standalone',
-    background_color: '#F4F6F9',
-    theme_color: '#A30C24',
-    icons: [
-      {
-        src: 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 192 192%22%3E%3Crect width=%22192%22 height=%22192%22 rx=%2240%22 fill=%22%23C8102E%22/%3E%3Cpath d=%22M30 96h28l16-40 32 96 16-56h40%22 fill=%22none%22 stroke=%22white%22 stroke-width=%2210%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E',
-        sizes: '192x192',
-        type: 'image/svg+xml',
-      },
-    ],
-  };
-  const l = document.createElement('link');
-  l.rel = 'manifest';
-  l.href = URL.createObjectURL(
-    new Blob([JSON.stringify(m)], { type: 'application/manifest+json' }),
-  );
-  document.head.appendChild(l);
-} catch (e) {}
+/* install banner */
+let deferredPrompt = null;
+const ib = $('#installBanner');
+const installBtn = $('#installBtn');
+const dismissBtn = $('#installDismiss');
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  ib.classList.add('show');
+});
+installBtn.addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const result = await deferredPrompt.userChoice;
+  if (result.outcome === 'accepted') ib.classList.remove('show');
+  deferredPrompt = null;
+});
+dismissBtn.addEventListener('click', () => {
+  ib.classList.remove('show');
+  deferredPrompt = null;
+});
+window.addEventListener('appinstalled', () => ib.classList.remove('show'));
 
 renderDashboard();

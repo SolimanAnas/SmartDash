@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>404 — DCAS Airport Operations</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap');
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: linear-gradient(160deg, #0f1923 0%, #15202b 40%, #1b2735 100%);
+        font-family: 'Sora', sans-serif;
+        color: #fff;
+        padding: 24px;
+        overflow: hidden;
+      }
+      .scene {
+        text-align: center;
+        position: relative;
+      }
+      .glow {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        translate: -50% -50%;
+        width: 340px;
+        height: 340px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(200, 16, 46, 0.15) 0%, transparent 70%);
+        pointer-events: none;
+        z-index: 0;
+      }
+      .num {
+        font-size: 140px;
+        font-weight: 800;
+        line-height: 1;
+        letter-spacing: -0.06em;
+        background: linear-gradient(180deg, #fff 30%, rgba(255, 255, 255, 0.3));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        position: relative;
+        z-index: 1;
+        animation: drift 4s ease-in-out infinite;
+      }
+      @keyframes drift {
+        0%,
+        100% {
+          transform: translateY(0) scale(1);
+        }
+        50% {
+          transform: translateY(-8px) scale(1.02);
+        }
+      }
+      .pulse-line {
+        width: 200px;
+        height: 2px;
+        margin: 4px auto 28px;
+        position: relative;
+        z-index: 1;
+        background: linear-gradient(90deg, transparent, rgba(200, 16, 46, 0.3), transparent);
+        overflow: visible;
+      }
+      .pulse-line svg {
+        width: 200px;
+        height: 28px;
+        display: block;
+        margin-top: -13px;
+      }
+      .pulse-line path {
+        stroke: #c8102e;
+        stroke-width: 2;
+        fill: none;
+        stroke-linecap: round;
+      }
+      .tag {
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 11px;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.3em;
+        color: rgba(255, 255, 255, 0.35);
+        margin-bottom: 10px;
+        position: relative;
+        z-index: 1;
+      }
+      .msg {
+        font-size: 15px;
+        color: rgba(255, 255, 255, 0.5);
+        line-height: 1.7;
+        margin-bottom: 36px;
+        max-width: 320px;
+        margin-left: auto;
+        margin-right: auto;
+        position: relative;
+        z-index: 1;
+        font-weight: 400;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 32px;
+        border-radius: 14px;
+        border: none;
+        cursor: pointer;
+        background: linear-gradient(150deg, #c8102e, #a30c24);
+        color: #fff;
+        font-family: 'Sora', sans-serif;
+        font-size: 14px;
+        font-weight: 700;
+        box-shadow: 0 8px 28px rgba(200, 16, 46, 0.32);
+        transition: 0.2s;
+        text-decoration: none;
+        position: relative;
+        z-index: 1;
+      }
+      .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 36px rgba(200, 16, 46, 0.4);
+      }
+      .btn:active {
+        transform: scale(0.97);
+      }
+      .btn svg {
+        width: 18px;
+        height: 18px;
+        flex: 0 0 auto;
+      }
+      .footer {
+        position: fixed;
+        bottom: 24px;
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-size: 11px;
+        font-family: 'IBM Plex Mono', monospace;
+        color: rgba(255, 255, 255, 0.2);
+        letter-spacing: 0.05em;
+      }
+      @media (max-width: 480px) {
+        .num {
+          font-size: 100px;
+        }
+        .glow {
+          width: 240px;
+          height: 240px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="scene">
+      <div class="glow"></div>
+      <div class="tag">LOST SIGNAL</div>
+      <div class="num">404</div>
+      <div class="pulse-line">
+        <svg viewBox="0 0 200 28" preserveAspectRatio="xMidYMid meet">
+          <path d="M0 14h30l8-10 12 20 10-16 10 12 8-6 12 10 12-16 8 8 30 8h50">
+            <animate
+              attributeName="d"
+              dur="2.4s"
+              repeatCount="indefinite"
+              values="M0 14h30l8-10 12 20 10-16 10 12 8-6 12 10 12-16 8 8 30 8h50;
+                  M0 14h30l8-4 12 10 10-8 10 12 8-10 12 14 12-10 8 4 30 8h50;
+                  M0 14h30l8-10 12 20 10-16 10 12 8-6 12 10 12-16 8 8 30 8h50"
+            />
+          </path>
+        </svg>
+      </div>
+      <p class="msg">The page you're looking for is off the grid. No signal, no trace.</p>
+      <a class="btn" href="index.html">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.4"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <polyline points="9 22 9 12 15 12 15 22" />
+        </svg>
+        Return to base
+      </a>
+    </div>
+    <div class="footer">DCAS AIRPORT OPERATIONS</div>
+  </body>
+</html>

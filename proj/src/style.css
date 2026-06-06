@@ -1409,3 +1409,87 @@ a {
 .req {
   color: var(--red);
 }
+
+/* install banner */
+.install-banner {
+  position: fixed;
+  bottom: calc(var(--nav-h) + env(safe-area-inset-bottom));
+  inset-inline: 0;
+  z-index: 55;
+  padding: 10px 14px;
+  transform: translateY(120%);
+  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+  pointer-events: none;
+}
+.install-banner.show {
+  transform: none;
+  pointer-events: auto;
+}
+.install-banner-inner {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  background: linear-gradient(160deg, #1b2735, #15202b);
+  color: #fff;
+  padding: 12px 14px;
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
+  max-width: 480px;
+  margin: 0 auto;
+}
+.install-icon {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  background: linear-gradient(150deg, var(--red), var(--red-d));
+  border-radius: 10px;
+  padding: 6px;
+}
+.install-text {
+  flex: 1;
+  min-width: 0;
+}
+.install-title {
+  font-family: var(--f-disp);
+  font-weight: 700;
+  font-size: 13px;
+}
+.install-desc {
+  font-size: 11px;
+  opacity: 0.6;
+  margin-top: 1px;
+}
+.install-btn {
+  flex: 0 0 auto;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: none;
+  background: var(--red);
+  color: #fff;
+  font-family: var(--f-disp);
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  transition: 0.15s;
+}
+.install-btn:active {
+  background: var(--red-d);
+  transform: scale(0.95);
+}
+.install-dismiss {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 16px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: 0.15s;
+}
+.install-dismiss:active {
+  background: rgba(255, 255, 255, 0.16);
+}

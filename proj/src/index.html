@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#A30C24" />
+    <link rel="manifest" href="manifest.json" />
     <title>DCAS Airport Operations Platform</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -689,8 +690,35 @@
     </div>
     <div class="toast" id="toast"></div>
 
+    <div id="installBanner" class="install-banner">
+      <div class="install-banner-inner">
+        <svg
+          class="install-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M3 12h4l2-5 4 12 2-7h6" />
+        </svg>
+        <div class="install-text">
+          <div class="install-title">DCAS Airport Operations</div>
+          <div class="install-desc">Install for offline access</div>
+        </div>
+        <button class="install-btn" id="installBtn">Install</button>
+        <button class="install-dismiss" id="installDismiss" aria-label="Dismiss">&times;</button>
+      </div>
+    </div>
+
     <script>
       /*BUNDLE*/
+    </script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(function () {});
+      }
     </script>
   </body>
 </html>

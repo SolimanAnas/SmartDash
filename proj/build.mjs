@@ -23,4 +23,11 @@ html = html.replace('/*BUNDLE*/', () => js);
 fs.mkdirSync('dist', { recursive: true });
 fs.writeFileSync('dist/dcas-airport-platform.html', html);
 fs.writeFileSync('../index.html', html);
+
+['manifest.json', 'sw.js', '404.html'].forEach((f) => {
+  if (fs.existsSync('src/' + f)) {
+    fs.copyFileSync('src/' + f, 'dist/' + f);
+    fs.copyFileSync('src/' + f, '../' + f);
+  }
+});
 console.log('Built dist/dcas-airport-platform.html', html.length, 'bytes  (js', js.length, 'bytes  css', css.length, 'bytes)');
