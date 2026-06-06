@@ -1,11 +1,12 @@
 {
   "name": "SmartDash",
   "short_name": "SmartDash",
-  "description": "Airport ambulance operations dashboard for Dubai Corporation for Ambulance Services",
+  "description": "Airport ambulance operations dashboard for DCAS",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#F4F6F9",
   "theme_color": "#A30C24",
+  "id": "/SmartDash/",
   "categories": ["healthcare", "productivity", "utilities"],
   "icons": [
     { "src": "icons/icon-192x192.png", "sizes": "192x192", "type": "image/png" },

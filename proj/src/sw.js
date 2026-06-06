@@ -1,4 +1,4 @@
-const CACHE = 'smartdash-v4';
+const CACHE = 'smartdash-v5';
 const PRECACHE = [
   'manifest.json',
   '404.html',
@@ -12,7 +12,7 @@ const PRECACHE = [
   'icons/icon-384x384.png',
   'icons/icon-512x512.png',
 ];
-const CDN_CACHE = 'smartdash-cdn-v4';
+const CDN_CACHE = 'smartdash-cdn-v5';
 const OLD_CACHES = [
   'dcas-ops-v1',
   'dcas-ops-v2',
