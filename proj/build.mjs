@@ -4,38 +4,103 @@ import fs from 'fs';
 const [jsRes, cssRes] = await Promise.all([
   esbuild.build({
     entryPoints: ['src/app.js'],
-    bundle: true, minify: true, format: 'iife',
-    loader: { '.json': 'json' },
-    legalComments: 'none', write: false,
+    bundle: true,
+    minify: true,
+    format: 'iife',
+    loader: {
+      '.json': 'json'
+    },
+    legalComments: 'none',
+    write: false
   }),
+
   esbuild.build({
     entryPoints: ['src/style.css'],
-    loader: { '.css': 'css' },
-    minify: true, write: false,
-  }),
+    loader: {
+      '.css': 'css'
+    },
+    minify: true,
+    write: false
+  })
 ]);
 
 const js = jsRes.outputFiles[0].text;
 const css = cssRes.outputFiles[0].text;
-let html = fs.readFileSync('src/index.html', 'utf8');
-html = html.replace('/*CSS*/', () => css);
-html = html.replace('/*BUNDLE*/', () => js);
-fs.mkdirSync('dist', { recursive: true });
-fs.writeFileSync('dist/dcas-airport-platform.html', html);
-fs.writeFileSync('../index.html', html);
 
-['manifest.json', 'sw.js', '404.html'].forEach((f) => {
-  if (fs.existsSync('src/' + f)) {
-    fs.copyFileSync('src/' + f, 'dist/' + f);
-    fs.copyFileSync('src/' + f, '../' + f);
+/*
+ * Load the NEW source HTML from:
+ * proj/src/index.html
+ */
+let html = fs.readFileSync('src/index.html', 'utf8');
+
+/*
+ * Inject bundled CSS and JS
+ */
+html = html.replace('/*CSS*/', css);
+html = html.replace('/*BUNDLE*/', js);
+
+/*
+ * Create dist folder
+ */
+fs.mkdirSync('dist', { recursive: true });
+
+/*
+ * Build artifact
+ */
+fs.writeFileSync(
+  'dist/dcas-airport-platform.html',
+  html,
+  'utf8'
+);
+
+/*
+ * Publish directly to repository root
+ * (GitHub Pages serves this file)
+ */
+fs.writeFileSync(
+  '../index.html',
+  html,
+  'utf8'
+);
+
+/*
+ * Copy supporting files
+ */
+for (const file of ['manifest.json', 'sw.js', '404.html']) {
+  const srcFile = `src/${file}`;
+
+  if (fs.existsSync(srcFile)) {
+    fs.copyFileSync(srcFile, `dist/${file}`);
+    fs.copyFileSync(srcFile, `../${file}`);
   }
-});
-if (fs.existsSync('src/icons')) {
-  ['dist/icons', '../icons'].forEach((d) => {
-    fs.mkdirSync(d, { recursive: true });
-    fs.readdirSync('src/icons').forEach((f) => {
-      fs.copyFileSync('src/icons/' + f, d + '/' + f);
-    });
-  });
 }
-console.log('Built dist/dcas-airport-platform.html', html.length, 'bytes  (js', js.length, 'bytes  css', css.length, 'bytes)');
+
+/*
+ * Copy icons
+ */
+if (fs.existsSync('src/icons')) {
+  fs.mkdirSync('dist/icons', { recursive: true });
+  fs.mkdirSync('../icons', { recursive: true });
+
+  for (const file of fs.readdirSync('src/icons')) {
+    fs.copyFileSync(
+      `src/icons/${file}`,
+      `dist/icons/${file}`
+    );
+
+    fs.copyFileSync(
+      `src/icons/${file}`,
+      `../icons/${file}`
+    );
+  }
+}
+
+console.log(
+  'Built dist/dcas-airport-platform.html',
+  html.length,
+  'bytes (js',
+  js.length,
+  'bytes css',
+  css.length,
+  'bytes)'
+);
