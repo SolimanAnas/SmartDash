@@ -3,7 +3,7 @@ import { esc, deb, dateOf, dispName, initials, telOf, uid, today, fmtD } from '.
 
 /* ===== utilities ===== */
 const $ = (s) => document.querySelector(s);
-const TODAY = 5;
+const TODAY = Math.min(new Date().getDate(), 30);
 let day = TODAY,
   view = 'dashboard';
 let stfFilter = 'all',
