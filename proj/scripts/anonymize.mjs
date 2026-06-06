@@ -1,6 +1,9 @@
 import { readFileSync, writeFileSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
-const path = 'G:/Github Repos/Smart Dash/proj/data/roster.json';
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const path = resolve(ROOT, 'data', 'roster.json');
 const raw = readFileSync(path, 'utf8');
 const data = JSON.parse(raw);
 

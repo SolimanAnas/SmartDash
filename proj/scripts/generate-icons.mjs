@@ -1,8 +1,11 @@
-import { readFileSync, mkdirSync, writeFileSync } from 'fs';
+import { mkdirSync, writeFileSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import sharp from 'sharp';
 
-const SRC = 'G:/Github Repos/Smart Dash/icon/logo.png';
-const OUT = 'G:/Github Repos/Smart Dash/proj/src/icons';
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const SRC = resolve(ROOT, '..', 'icon', 'logo.png');
+const OUT = resolve(ROOT, 'src', 'icons');
 
 mkdirSync(OUT, { recursive: true });
 
