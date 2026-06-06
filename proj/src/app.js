@@ -405,25 +405,8 @@ function renderDashboard() {
     totCov = cov.reduce((a, c) => a + c.covered, 0);
   const covPct = Math.round((totCov / totStations) * 100);
   const openIssues = challenges.filter((c) => c.status !== 'Resolved').length;
-  $('#liveband').innerHTML =
-    '<div class="live"><div class="n good"><span class="livedot"></span>' +
-    onDuty +
-    '</div><div class="l">On duty</div></div>' +
-    '<div class="live"><div class="n">' +
-    totCov +
-    '/' +
-    totStations +
-    '</div><div class="l">Stations</div></div>' +
-    '<div class="live"><div class="n ' +
-    (covPct >= 90 ? 'good' : covPct >= 70 ? 'warn' : 'bad') +
-    '">' +
-    covPct +
-    '%</div><div class="l">Coverage</div></div>' +
-    '<div class="live"><div class="n ' +
-    (openIssues ? 'warn' : 'good') +
-    '">' +
-    openIssues +
-    '</div><div class="l">Open issues</div></div>';
+  const avail = Math.round((onDuty / STAFF.length) * 100);
+
   const expiredCerts = [],
     soonCerts = [];
   certifications.forEach((record) => {
@@ -436,28 +419,48 @@ function renderDashboard() {
   });
   const uniqueExpired = [...new Set(expiredCerts)].length;
   const uniqueSoon = [...new Set(soonCerts)].length;
-  if (uniqueExpired || uniqueSoon) {
-    const band = $('#liveband');
-    const html = band.innerHTML;
-    band.innerHTML =
-      html +
-      '<div style="grid-column:1/-1;background:linear-gradient(160deg,#1b2735,#15202B);color:#fff;padding:12px 14px;display:flex;align-items:center;gap:12px;cursor:pointer" data-act="go" data-v="staff">' +
-      (uniqueExpired
-        ? '<span style="display:inline-flex;align-items:center;gap:6px;background:var(--red-soft);color:var(--red-d);padding:5px 11px;border-radius:9px;font-size:12px;font-weight:700">' +
-          uniqueExpired +
-          ' expired</span>'
-        : '') +
-      (uniqueSoon
-        ? '<span style="display:inline-flex;align-items:center;gap:6px;background:var(--amber-soft);color:var(--amber);padding:5px 11px;border-radius:9px;font-size:12px;font-weight:700">' +
-          uniqueSoon +
-          ' expiring soon</span>'
-        : '') +
-      '<span style="font-size:12px;font-weight:600;opacity:.85">Certifications &rarr;</span></div>';
-  }
+
+  const bandItems = [
+    { n: onDuty, l: 'On duty', dot: true, cls: 'good' },
+    { n: totCov + '/' + totStations, l: 'Stations' },
+    { n: covPct + '%', l: 'Coverage', cls: covPct >= 90 ? 'good' : covPct >= 70 ? 'warn' : 'bad' },
+    { n: openIssues, l: 'Open issues', cls: openIssues ? 'warn' : 'good' },
+  ];
+  const colors = ['#ef4358', '#5f96e2', '#41b970', '#e3a531'];
+
+  $('#liveband').innerHTML =
+    '<div class="lb-grid">' +
+    bandItems
+      .map(
+        (b, i) =>
+          '<div class="lb-item" style="--accent:' +
+          colors[i] +
+          '"><div class="lb-n ' +
+          (b.cls || '') +
+          '">' +
+          (b.dot ? '<span class="lb-dot"></span>' : '') +
+          esc(b.n) +
+          '</div><div class="lb-l">' +
+          b.l +
+          '</div></div>',
+      )
+      .join('') +
+    '</div>' +
+    (uniqueExpired || uniqueSoon
+      ? '<div class="lb-cert" data-act="go" data-v="staff">' +
+        (uniqueExpired
+          ? '<span class="lb-badge lb-bad">' + uniqueExpired + ' expired</span>'
+          : '') +
+        (uniqueSoon
+          ? '<span class="lb-badge lb-warn">' + uniqueSoon + ' expiring soon</span>'
+          : '') +
+        '<span class="lb-cert-l">Certifications \u2192</span></div>'
+      : '');
+
   const r = latestReport(),
     p = prevReport();
   $('#repMonthLbl').textContent = r ? mLabel(r.month) : 'no reports yet';
-  const avail = Math.round((onDuty / STAFF.length) * 100);
+
   const trend = (cur, prev, inv) => {
     if (prev == null || cur == null) return '';
     const up = cur >= prev;
@@ -472,11 +475,12 @@ function renderDashboard() {
       '</div>'
     );
   };
+
   const cards = [
     {
       n: r ? r.cases : '\u2014',
       l: 'Cases this month',
-      ic: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+      ic: 'M22 12h-4l-3 9L9 3l-3 9H2',
       c: 'red',
       t: r && p ? trend(r.cases, p.cases) : '',
     },
@@ -484,14 +488,14 @@ function renderDashboard() {
       n: r ? r.resp : '\u2014',
       u: 'min',
       l: 'Avg response time',
-      ic: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+      ic: 'M12 7v5l3 2M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z',
       c: 'blue',
       t: r && p ? trend(r.resp, p.resp, true) : '',
     },
     {
       n: r ? r.rosc : '\u2014',
       l: 'ROSC cases',
-      ic: '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/>',
+      ic: 'M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z',
       c: 'green',
       t: r && p ? trend(r.rosc, p.rosc) : '',
     },
@@ -499,19 +503,19 @@ function renderDashboard() {
       n: avail,
       u: '%',
       l: 'Staff availability',
-      ic: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>',
+      ic: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
       c: 'amber',
     },
     {
       n: openIssues,
       l: 'Open challenges',
-      ic: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/>',
+      ic: 'M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h0',
       c: 'red',
     },
     {
       n: initiatives.filter((i) => i.status !== 'done').length,
       l: 'Active initiatives',
-      ic: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+      ic: 'M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11',
       c: 'night',
     },
   ];
@@ -522,34 +526,43 @@ function renderDashboard() {
     amber: ['var(--amber-soft)', 'var(--amber)'],
     night: ['var(--night-soft)', 'var(--night)'],
   };
-  $('#mgmtKpis').innerHTML = cards
+  const kpis = cards
     .map(
-      (c) =>
-        '<div class="kpi"><div class="ic" style="background:' +
+      (c, i) =>
+        '<div class="kpi" style="--i:' +
+        i +
+        '"><div class="kpi-accent" style="background:' +
+        cmap[c.c][1] +
+        '"></div><div class="kpi-body"><div class="kpi-top"><div class="kpi-n">' +
+        esc(c.n) +
+        (c.u ? '<span class="kpi-unit">' + c.u + '</span>' : '') +
+        '</div><div class="kpi-ic" style="background:' +
         cmap[c.c][0] +
         ';color:' +
         cmap[c.c][1] +
-        '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+        '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="' +
         c.ic +
-        '</svg></div><div class="n">' +
-        c.n +
-        (c.u ? '<small> ' + c.u + '</small>' : '') +
-        '</div><div class="l">' +
+        '"/></svg></div></div><div class="kpi-l">' +
         c.l +
         '</div>' +
         (c.t || '') +
-        '</div>',
+        '</div></div>',
     )
     .join('');
+  $('#mgmtKpis').innerHTML = kpis;
+
   $('#dashSpark').innerHTML = sparkline(
     reports
       .slice()
       .sort((a, b) => a.month.localeCompare(b.month))
       .map((x) => ({ x: x.month.slice(5), y: x.resp })),
   );
-  $('#dashCoverage').innerHTML = cov.map(covRow).join('');
+
+  $('#dashCoverage').innerHTML =
+    '<div class="cov-list">' + cov.map((c, i) => covRow(c, i)).join('') + '</div>';
 }
-function covRow(c) {
+function covRow(c, i) {
+  const pct = c.stations ? Math.round((c.covered / c.stations) * 100) : 0;
   const sp =
     c.status === 'ok'
       ? ['sp-ok', 'Covered']
@@ -557,25 +570,30 @@ function covRow(c) {
         ? ['sp-short', 'Short ' + c.gaps]
         : ['sp-crit', 'Critical ' + c.gaps];
   return (
-    '<div class="cov-row" data-act="term" data-ap="' +
+    '<div class="cov-row" style="--i:' +
+    (i || 0) +
+    '" data-act="term" data-ap="' +
     c.ap +
     '" data-term="' +
     esc(c.term || '') +
     '">' +
-    '<div class="cov-name"><div class="t">' +
+    '<div class="cov-bar"><div class="cov-fill" style="width:' +
+    pct +
+    '%"></div></div>' +
+    '<div class="cov-body"><div class="cov-top"><div class="cov-name">' +
     esc(c.label) +
-    '</div><div class="s">' +
+    '</div><span class="status-pill ' +
+    sp[0] +
+    '"><span class="d"></span>' +
+    sp[1] +
+    '</span></div>' +
+    '<div class="cov-meta">' +
     c.covered +
     '/' +
     c.stations +
     ' stations \u00b7 ' +
     c.headcount +
-    ' on duty</div></div>' +
-    '<span class="status-pill ' +
-    sp[0] +
-    '"><span class="d"></span>' +
-    sp[1] +
-    '</span></div>'
+    ' on duty</div></div></div>'
   );
 }
 
@@ -2260,6 +2278,7 @@ function emptyState(t) {
 /* ===== single delegated event dispatcher (no inline handlers, no globals) ===== */
 const ACTIONS = {
   go: (a) => go(a.v),
+  theme: () => toggleTheme(),
   step: (a) => stepDay(+a.n),
   today: () => setDay(TODAY),
   fab: () => onFab(),
@@ -2373,5 +2392,29 @@ dismissBtn.addEventListener('click', () => {
   deferredPrompt = null;
 });
 window.addEventListener('appinstalled', () => ib.classList.remove('show'));
+
+/* theme */
+const themeMeta = $('meta[name="theme-color"]');
+function applyTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  if (themeMeta) themeMeta.setAttribute('content', t === 'dark' ? '#0d1218' : '#ffffff');
+}
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+  const next = cur === 'dark' ? 'light' : 'dark';
+  Store.set('dcas_theme', next);
+  applyTheme(next);
+  toast(next === 'dark' ? 'Dark theme on' : 'Light theme on');
+}
+(() => {
+  const saved = Store.get('dcas_theme');
+  const mq = window.matchMedia('(prefers-color-scheme: dark)');
+  applyTheme(saved || (mq.matches ? 'dark' : 'light'));
+  // follow the system only while the user hasn't picked a theme explicitly
+  if (mq.addEventListener)
+    mq.addEventListener('change', (e) => {
+      if (!Store.get('dcas_theme')) applyTheme(e.matches ? 'dark' : 'light');
+    });
+})();
 
 renderDashboard();

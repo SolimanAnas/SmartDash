@@ -13,7 +13,7 @@ test('page loads with correct title and branding', async ({ page }) => {
 test('dashboard shows liveband with 4 stats', async ({ page }) => {
   const liveband = page.locator('#liveband');
   await expect(liveband).toBeVisible();
-  const lives = liveband.locator('.live');
+  const lives = liveband.locator('.lb-item');
   await expect(lives).toHaveCount(4);
   await expect(liveband.locator('text=On duty')).toBeVisible();
   await expect(liveband.locator('text=Stations')).toBeVisible();
