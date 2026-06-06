@@ -1,4 +1,4 @@
-const CACHE = 'dcas-ops-v2';
+const CACHE = 'dcas-ops-v3';
 const PRECACHE = [
   'manifest.json',
   '404.html',
@@ -12,7 +12,8 @@ const PRECACHE = [
   'icons/icon-384x384.png',
   'icons/icon-512x512.png',
 ];
-const CDN_CACHE = 'dcas-ops-cdn-v2';
+const CDN_CACHE = 'dcas-ops-cdn-v3';
+const OLD_CACHES = ['dcas-ops-v1', 'dcas-ops-v2', 'dcas-ops-cdn-v1', 'dcas-ops-cdn-v2'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -29,7 +30,9 @@ self.addEventListener('activate', (event) => {
     (async () => {
       const keys = await caches.keys();
       await Promise.all(
-        keys.filter((k) => k !== CACHE && k !== CDN_CACHE).map((k) => caches.delete(k)),
+        keys
+          .filter((k) => k !== CACHE && k !== CDN_CACHE)
+          .map((k) => caches.delete(k)),
       );
       await self.clients.claim();
     })(),
@@ -68,7 +71,9 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       (async () => {
         try {
-          const res = await fetch(event.request);
+          const bustUrl = new URL(event.request.url);
+          bustUrl.searchParams.set('_sw_cache', Date.now());
+          const res = await fetch(new Request(bustUrl, { cache: 'no-store' }));
           if (res.ok) {
             const cache = await caches.open(CACHE);
             cache.put(event.request, res.clone());
