@@ -2372,26 +2372,39 @@ try {
 
 /* install banner */
 let deferredPrompt = null;
+let installTimer = null;
 const ib = $('#installBanner');
 const installBtn = $('#installBtn');
 const dismissBtn = $('#installDismiss');
+function dismissInstall() {
+  ib.classList.add('hide');
+  ib.classList.remove('show');
+  setTimeout(() => ib.classList.remove('hide'), 500);
+  deferredPrompt = null;
+  if (installTimer) {
+    clearTimeout(installTimer);
+    installTimer = null;
+  }
+}
+function showInstall() {
+  ib.classList.remove('hide');
+  ib.classList.add('show');
+  installTimer = setTimeout(dismissInstall, 5000);
+}
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
-  ib.classList.add('show');
+  showInstall();
 });
 installBtn.addEventListener('click', async () => {
   if (!deferredPrompt) return;
   deferredPrompt.prompt();
   const result = await deferredPrompt.userChoice;
-  if (result.outcome === 'accepted') ib.classList.remove('show');
+  if (result.outcome === 'accepted') dismissInstall();
   deferredPrompt = null;
 });
-dismissBtn.addEventListener('click', () => {
-  ib.classList.remove('show');
-  deferredPrompt = null;
-});
-window.addEventListener('appinstalled', () => ib.classList.remove('show'));
+dismissBtn.addEventListener('click', dismissInstall);
+window.addEventListener('appinstalled', dismissInstall);
 
 /* theme */
 const themeMeta = $('meta[name="theme-color"]');

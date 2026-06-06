@@ -1657,37 +1657,70 @@ html[data-theme='dark'] .theme-toggle .ic-sun {
 /* install banner */
 .install-banner {
   position: fixed;
-  bottom: calc(var(--nav-h) + env(safe-area-inset-bottom));
+  bottom: 20vh;
   inset-inline: 0;
   z-index: 55;
-  padding: 10px 14px;
-  transform: translateY(120%);
-  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+  padding: 0 16px;
+  transform: translateY(40px);
+  opacity: 0;
+  transition:
+    transform 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1);
   pointer-events: none;
 }
 .install-banner.show {
-  transform: none;
+  transform: translateY(0);
+  opacity: 1;
   pointer-events: auto;
+}
+.install-banner.hide {
+  transform: translateY(40px);
+  opacity: 0;
 }
 .install-banner-inner {
   display: flex;
   align-items: center;
-  gap: 11px;
-  background: linear-gradient(160deg, #1b2735, #15202b);
-  color: #fff;
-  padding: 12px 14px;
-  border-radius: 16px;
-  box-shadow: var(--shadow-lg);
-  max-width: 480px;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  padding: 14px 14px 14px 16px;
+  border-radius: 18px;
+  box-shadow:
+    0 8px 32px rgba(20, 28, 46, 0.12),
+    0 2px 8px rgba(20, 28, 46, 0.06);
+  max-width: 420px;
   margin: 0 auto;
+  overflow: hidden;
+  position: relative;
+}
+.install-banner-inner::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--red), var(--red-d));
+  border-radius: 0 3px 0 0;
+  width: 100%;
+  transform-origin: left;
+  animation: install-progress 5s linear forwards;
+}
+@keyframes install-progress {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
 }
 .install-icon {
-  width: 34px;
-  height: 34px;
+  width: 38px;
+  height: 38px;
   flex: 0 0 auto;
   background: linear-gradient(150deg, var(--red), var(--red-d));
-  border-radius: 10px;
-  padding: 6px;
+  border-radius: 11px;
+  padding: 7px;
 }
 .install-text {
   flex: 1;
@@ -1696,23 +1729,24 @@ html[data-theme='dark'] .theme-toggle .ic-sun {
 .install-title {
   font-family: var(--f-disp);
   font-weight: 700;
-  font-size: 13px;
+  font-size: 13.5px;
+  color: var(--ink);
 }
 .install-desc {
-  font-size: 11px;
-  opacity: 0.6;
-  margin-top: 1px;
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 2px;
 }
 .install-btn {
   flex: 0 0 auto;
-  padding: 8px 16px;
-  border-radius: 10px;
+  padding: 9px 18px;
+  border-radius: 11px;
   border: none;
   background: var(--red);
   color: #fff;
   font-family: var(--f-disp);
   font-weight: 700;
-  font-size: 12px;
+  font-size: 12.5px;
   cursor: pointer;
   transition: 0.15s;
 }
@@ -1726,8 +1760,8 @@ html[data-theme='dark'] .theme-toggle .ic-sun {
   height: 28px;
   border-radius: 8px;
   border: none;
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.5);
+  background: var(--off-soft);
+  color: var(--muted);
   font-size: 16px;
   cursor: pointer;
   display: grid;
@@ -1735,5 +1769,5 @@ html[data-theme='dark'] .theme-toggle .ic-sun {
   transition: 0.15s;
 }
 .install-dismiss:active {
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--line);
 }
