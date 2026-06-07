@@ -178,34 +178,9 @@
         <h2>Command Center</h2>
         <span class="sub" id="cmdDayLbl"></span>
       </div>
-      <div class="daysel">
-        <button class="nav-d" data-act="step" data-n="-1">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.2"
-            stroke-linecap="round"
-          >
-            <path d="M15 18l-6-6 6-6" />
-          </svg>
-        </button>
-        <div class="center">
-          <div class="d" id="cmdDate"></div>
-          <div class="wd" id="cmdWd"></div>
-        </div>
-        <button class="today-b" id="cmdToday" data-act="today">Today</button>
-        <button class="nav-d" data-act="step" data-n="1">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.2"
-            stroke-linecap="round"
-          >
-            <path d="M9 18l6-6-6-6" />
-          </svg>
-        </button>
+      <div class="shift-sel" id="cmdShiftSel">
+        <button class="shift-btn active" data-act="cmd-shift" data-shift="D">Day</button>
+        <button class="shift-btn" data-act="cmd-shift" data-shift="N">Night</button>
       </div>
       <div class="card">
         <div class="card-h">

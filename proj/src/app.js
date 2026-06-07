@@ -5,7 +5,8 @@ import { esc, deb, dateOf, dispName, initials, telOf, uid, today, fmtD } from '.
 const $ = (s) => document.querySelector(s);
 const TODAY = Math.min(new Date().getDate(), 30);
 let day = TODAY,
-  view = sessionStorage.getItem('dcas_view') || 'dashboard';
+  view = sessionStorage.getItem('dcas_view') || 'dashboard',
+  cmdShift = new Date().getHours() >= 5 && new Date().getHours() < 16 ? 'D' : 'N';
 let stfFilter = 'all',
   chFilter = 'all',
   achFilter = 'all',
@@ -407,8 +408,9 @@ const UNIT_ORDER = {
   'AIRPORT 40': 14,
   'AIRPORT 41': 15,
 };
-function terminalCoverage(d) {
+function terminalCoverage(d, shiftCode) {
   const all = stationsList();
+  const code = shiftCode || (isDuty('D') ? 'D' : 'N');
   return TERMS.map((t) => {
     const label = t[0],
       ap = t[1],
@@ -419,7 +421,7 @@ function terminalCoverage(d) {
     let covered = 0,
       headcount = 0;
     sts.forEach((s) => {
-      const on = s.crew.filter((c) => isDuty(shiftOn(c, d)));
+      const on = s.crew.filter((c) => shiftOn(c, d) === code);
       headcount += on.length;
       if (on.length) covered++;
     });
@@ -478,7 +480,8 @@ function renderDashboard() {
   $('#dsWd').textContent = dateOf(day).toLocaleDateString('en-US', { weekday: 'long' });
   $('#dsToday').classList.toggle('show', day !== TODAY);
   const onDuty = STAFF.filter((s) => isDuty(shiftOn(s, day))).length;
-  const cov = terminalCoverage(day);
+  const dashShift = new Date().getHours() >= 5 && new Date().getHours() < 16 ? 'D' : 'N';
+  const cov = terminalCoverage(day, dashShift);
   const totStations = cov.reduce((a, c) => a + c.stations, 0),
     totCov = cov.reduce((a, c) => a + c.covered, 0);
   const covPct = Math.round((totCov / totStations) * 100);
@@ -536,7 +539,7 @@ function renderDashboard() {
       : '');
 
   const todayStr = today();
-  const todayShift = (new Date().getHours() >= 5 && new Date().getHours() < 16) ? 'Day' : 'Night';
+  const todayShift = new Date().getHours() >= 5 && new Date().getHours() < 16 ? 'Day' : 'Night';
   const hasTodayReport = shiftReports.some((r) => r.date === todayStr && r.shift === todayShift);
   $('#shiftNudge').innerHTML = hasTodayReport
     ? ''
@@ -688,11 +691,12 @@ function covRow(c, i) {
 
 /* ===== command center ===== */
 function renderCommand() {
-  $('#cmdDate').textContent = 'June ' + day;
-  $('#cmdWd').textContent = dateOf(day).toLocaleDateString('en-US', { weekday: 'long' });
-  $('#cmdToday').classList.toggle('show', day !== TODAY);
-  $('#cmdDayLbl').textContent = 'June ' + day;
-  const cov = terminalCoverage(day);
+  const shiftLabel = cmdShift === 'D' ? 'Day' : 'Night';
+  $('#cmdDayLbl').textContent = shiftLabel + ' shift \u00b7 June ' + day;
+  document.querySelectorAll('#cmdShiftSel .shift-btn').forEach((b) => {
+    b.classList.toggle('active', b.dataset.shift === cmdShift);
+  });
+  const cov = terminalCoverage(day, cmdShift);
   $('#termMap').innerHTML = cov
     .map((c) => {
       const z = c.status === 'ok' ? 'z-ok' : c.status === 'short' ? 'z-short' : 'z-crit';
@@ -1414,7 +1418,11 @@ function editShift(id) {
   const r = id ? shiftReports.filter((x) => x.id === id)[0] : null;
   const isEdit = !!r;
   const dateVal = r ? r.date : today();
-  const shiftVal = r ? r.shift : (new Date().getHours() >= 5 && new Date().getHours() < 16) ? 'Day' : 'Night';
+  const shiftVal = r
+    ? r.shift
+    : new Date().getHours() >= 5 && new Date().getHours() < 16
+      ? 'Day'
+      : 'Night';
   const teamVal = r ? r.team : teamOnShift(dateVal, shiftVal === 'Day' ? 'D' : 'N');
   const onDuty = onDutyFor(dateVal, shiftVal === 'Day' ? 'D' : 'N');
   const sicRecord = STAFF.find((s) => s.team === teamVal && s.isSupervisor);
@@ -2877,6 +2885,10 @@ const ACTIONS = {
   'shift-filter': (a) => {
     shiftFilter = a.key;
     renderShift();
+  },
+  'cmd-shift': (a) => {
+    cmdShift = a.shift;
+    renderCommand();
   },
 };
 document.addEventListener('click', (e) => {

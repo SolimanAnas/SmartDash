@@ -2003,3 +2003,34 @@ html[data-theme='dark'] .theme-toggle .ic-sun {
 .shift-nudge-btn:active {
   transform: scale(0.96);
 }
+
+/* command center shift selector */
+.shift-sel {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.shift-btn {
+  flex: 1;
+  padding: 10px 0;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  font-family: var(--f-disp);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+.shift-btn:hover {
+  border-color: var(--ink2);
+}
+.shift-btn.active {
+  background: var(--ink);
+  color: var(--invert-ink);
+  border-color: var(--ink);
+}
