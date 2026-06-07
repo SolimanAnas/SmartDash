@@ -9,7 +9,8 @@ let day = TODAY,
 let stfFilter = 'all',
   chFilter = 'all',
   achFilter = 'all',
-  initFilter = 'all';
+  initFilter = 'all',
+  shiftFilter = 'all';
 const CODES = { D: { l: 'Day' }, N: { l: 'Night' }, X: { l: 'Off' }, AL: { l: 'Leave' } };
 const shiftOn = (s, d) => s.shifts[d - 1] || 'X';
 const isDuty = (c) => c === 'D' || c === 'N';
@@ -47,10 +48,12 @@ let reports = JSON.parse(Store.get('dcas_rep') || '[]');
 let achievements = JSON.parse(Store.get('dcas_ach') || '[]');
 let initiatives = JSON.parse(Store.get('dcas_init') || '[]');
 let certifications = JSON.parse(Store.get('dcas_cert') || '[]');
+let shiftReports = JSON.parse(Store.get('dcas_shift') || '[]');
 const saveCh = () => Store.set('dcas_ch', JSON.stringify(challenges));
 const saveRep = () => Store.set('dcas_rep', JSON.stringify(reports));
 const saveAch = () => Store.set('dcas_ach', JSON.stringify(achievements));
 const saveInit = () => Store.set('dcas_init', JSON.stringify(initiatives));
+const saveShiftR = () => Store.set('dcas_shift', JSON.stringify(shiftReports));
 const saveCert = () => Store.set('dcas_cert', JSON.stringify(certifications));
 const certExpiryDays = (d) =>
   d ? Math.ceil((new Date(d + 'T23:59') - Date.now()) / 86400000) : -Infinity;
@@ -226,11 +229,56 @@ function seedSample(force) {
       },
     },
   ];
+  shiftReports = [
+    {
+      id: uid(),
+      date: '2026-06-06',
+      shift: 'Day',
+      team: 'A',
+      sicName: 'Soliman Anas',
+      casesHandled: 8,
+      transfers: 3,
+      refusals: 1,
+      roscCount: 1,
+      staffPresent: STAFF.filter((s) => s.team === 'A')
+        .slice(0, 4)
+        .map((s) => s.id),
+      staffingShortages: '',
+      equipmentIssues: '',
+      pendingIncidents: '',
+      notes: 'Smooth shift. All stations covered.',
+      linkedChallenges: [],
+      createdAt: Date.now() - 86400000,
+      updatedAt: Date.now() - 86400000,
+    },
+    {
+      id: uid(),
+      date: '2026-06-06',
+      shift: 'Night',
+      team: 'B',
+      sicName: '',
+      casesHandled: 5,
+      transfers: 2,
+      refusals: 0,
+      roscCount: 0,
+      staffPresent: STAFF.filter((s) => s.team === 'B')
+        .slice(0, 3)
+        .map((s) => s.id),
+      staffingShortages: 'Short 1 medic on Terminal 3',
+      equipmentIssues: 'Portable radio #7 battery low',
+      pendingIncidents: '',
+      notes: '',
+      linkedChallenges: [],
+      createdAt: Date.now() - 43200000,
+      updatedAt: Date.now() - 43200000,
+    },
+  ];
   saveCert();
   saveRep();
   saveCh();
   saveInit();
   saveAch();
+  saveShiftR();
   Store.set('dcas_seeded', '1');
   if (force) {
     go('dashboard');
@@ -263,13 +311,14 @@ function go(v) {
     initiatives: 'more',
     upload: 'more',
     settings: 'more',
+    shift: 'more',
   };
   document
     .querySelectorAll('.nav button')
     .forEach((b) => b.classList.toggle('active', b.dataset.v === (nm[v] || v)));
   $('#fab').classList.toggle(
     'show',
-    ['challenges', 'achievements', 'initiatives', 'reports'].indexOf(v) >= 0,
+    ['challenges', 'achievements', 'initiatives', 'reports', 'shift'].indexOf(v) >= 0,
   );
   window.scrollTo({ top: 0, behavior: 'smooth' });
   const r = {
@@ -284,6 +333,7 @@ function go(v) {
     initiatives: renderInit,
     upload: renderUpload,
     settings: renderSettings,
+    shift: renderShift,
   };
   if (r[v]) r[v]();
 }
@@ -294,6 +344,7 @@ function onFab() {
       achievements: () => editAch(null),
       initiatives: () => editInit(null),
       reports: () => editReport(null),
+      shift: () => editShift(null),
     })[view] || function () {}
   )();
 }
@@ -482,6 +533,17 @@ function renderDashboard() {
           : '') +
         '<span class="lb-cert-l">Certifications \u2192</span></div>'
       : '');
+
+  const todayStr = today();
+  const todayShift = new Date().getHours() < 14 ? 'Day' : 'Night';
+  const hasTodayReport = shiftReports.some((r) => r.date === todayStr && r.shift === todayShift);
+  $('#shiftNudge').innerHTML = hasTodayReport
+    ? ''
+    : '<div class="shift-nudge"><div class="shift-nudge-body"><span class="shift-nudge-icon">\u26a0</span><div><div class="shift-nudge-t">End-of-shift report due</div><div class="shift-nudge-d">' +
+      todayShift +
+      ' shift \u00b7 ' +
+      fmtD(todayStr) +
+      '</div></div></div><button class="shift-nudge-btn" data-act="shift-new">File report \u2192</button></div>';
 
   const r = latestReport(),
     p = prevReport();
@@ -1243,6 +1305,323 @@ function renderChallenges() {
         .join('')
     : emptyState('No challenges \u2014 tap + to log one');
 }
+
+/* ===== shift reports ===== */
+const SH_TEAMS = ['A', 'B', 'C', 'D'];
+function teamOnShift(dateStr, code) {
+  const counts = {};
+  SH_TEAMS.forEach((t) => (counts[t] = 0));
+  STAFF.forEach((s) => {
+    if (shiftOn(s, dateStr) === code) counts[s.team] = (counts[s.team] || 0) + 1;
+  });
+  let best = 'A',
+    max = 0;
+  Object.entries(counts).forEach(([t, n]) => {
+    if (n > max) {
+      max = n;
+      best = t;
+    }
+  });
+  return max > 0 ? best : 'A';
+}
+function onDutyFor(dateStr, code) {
+  return STAFF.filter((s) => shiftOn(s, dateStr) === code);
+}
+function renderShift() {
+  const q = ($('#shiftSearch').value || '').trim().toLowerCase();
+  const chips = [{ k: 'all', t: 'All' }]
+    .concat([
+      { k: 'Day', t: 'Day' },
+      { k: 'Night', t: 'Night' },
+    ])
+    .concat(SH_TEAMS.map((t) => ({ k: 'team-' + t, t: 'Team ' + t })));
+  $('#shiftChips').innerHTML = chips
+    .map(
+      (c) =>
+        '<button class="chip ' +
+        (shiftFilter === c.k ? 'active' : '') +
+        '" data-act="shift-filter" data-key="' +
+        esc(c.k) +
+        '">' +
+        c.t +
+        '</button>',
+    )
+    .join('');
+  let list = shiftReports
+    .slice()
+    .sort(
+      (a, b) =>
+        (b.date || '').localeCompare(a.date || '') || (b.shift || '').localeCompare(a.shift || ''),
+    );
+  if (shiftFilter === 'Day' || shiftFilter === 'Night')
+    list = list.filter((r) => r.shift === shiftFilter);
+  else if (shiftFilter.startsWith('team-'))
+    list = list.filter((r) => r.team === shiftFilter.slice(5));
+  if (q)
+    list = list.filter(
+      (r) =>
+        (r.sicName + ' ' + r.notes + ' ' + r.team + ' ' + r.date).toLowerCase().indexOf(q) >= 0,
+    );
+  $('#shiftCount').textContent = shiftReports.length + ' total';
+  $('#shiftList').innerHTML = list.length
+    ? list
+        .map(
+          (r, i) =>
+            '<div class="rec" style="animation-delay:' +
+            Math.min(i, 12) * 0.02 +
+            's" data-act="shift-view" data-id="' +
+            esc(r.id) +
+            '"><div class="crewline" style="margin:0 0 9px"><span class="tag" style="background:var(--' +
+            (r.shift === 'Day' ? 'day' : 'night') +
+            '-soft);color:var(--' +
+            (r.shift === 'Day' ? 'day' : 'night') +
+            ')">' +
+            esc(r.shift) +
+            '</span><span class="tag" style="background:var(--red-soft);color:var(--red-d)">Team ' +
+            esc(r.team) +
+            '</span><span class="tag" style="background:transparent;color:var(--muted)">' +
+            fmtD(r.date) +
+            '</span></div><div class="rec-main"><div class="t" style="font-size:14px;line-height:1.45">' +
+            esc(r.sicName || 'Unknown SIC') +
+            '</div><div class="m" style="margin-top:6px">Cases: ' +
+            (r.casesHandled || 0) +
+            ' \u00b7 Transfers: ' +
+            (r.transfers || 0) +
+            ' \u00b7 Refusals: ' +
+            (r.refusals || 0) +
+            '</div></div></div>',
+        )
+        .join('')
+    : emptyState('No shift reports \u2014 tap + to file one');
+}
+function editShift(id) {
+  const r = id ? shiftReports.filter((x) => x.id === id)[0] : null;
+  const isEdit = !!r;
+  const dateVal = r ? r.date : today();
+  const shiftVal = r ? r.shift : new Date().getHours() < 14 ? 'Day' : 'Night';
+  const teamVal = r ? r.team : teamOnShift(dateVal, shiftVal === 'Day' ? 'D' : 'N');
+  const onDuty = onDutyFor(dateVal, shiftVal === 'Day' ? 'D' : 'N');
+  const sicRecord = STAFF.find((s) => s.team === teamVal && s.isSupervisor);
+  const sicName = r ? r.sicName : sicRecord ? sicRecord.name : '';
+  const staffIds = r ? r.staffPresent || [] : onDuty.map((s) => s.id);
+  const staffChecklist = onDuty.length
+    ? onDuty
+        .map(
+          (s) =>
+            '<label class="shift-staff"><input type="checkbox" value="' +
+            s.id +
+            '"' +
+            (staffIds.indexOf(s.id) >= 0 ? ' checked' : '') +
+            '/><span>' +
+            esc(s.name) +
+            ' <span style="color:var(--muted);font-size:11px">' +
+            esc(s.team) +
+            '</span></span></label>',
+        )
+        .join('')
+    : '<p style="color:var(--muted);font-size:13px">No crew on duty for this shift</p>';
+  openSheet(
+    isEdit ? 'Edit shift report' : 'File shift report',
+    '<div class="field-row"><div class="field"><label>Date</label><input type="date" id="sh_date" value="' +
+      dateVal +
+      '"/></div><div class="field"><label>Shift</label><select id="sh_shift"><option value="Day"' +
+      (shiftVal === 'Day' ? ' selected' : '') +
+      '>Day</option><option value="Night"' +
+      (shiftVal === 'Night' ? ' selected' : '') +
+      '>Night</option></select></div></div>' +
+      '<div class="field-row"><div class="field"><label>Team</label><select id="sh_team">' +
+      SH_TEAMS.map(
+        (t) =>
+          '<option value="' +
+          t +
+          '"' +
+          (t === teamVal ? ' selected' : '') +
+          '>Team ' +
+          t +
+          '</option>',
+      ).join('') +
+      '</select></div><div class="field"><label>SIC</label><input id="sh_sic" value="' +
+      esc(sicName) +
+      '" placeholder="Supervisor name"/></div></div>' +
+      '<div class="field-row"><div class="field"><label>Cases handled</label><input type="number" id="sh_cases" min="0" value="' +
+      (r ? r.casesHandled || 0 : 0) +
+      '"/></div><div class="field"><label>Transfers</label><input type="number" id="sh_transfers" min="0" value="' +
+      (r ? r.transfers || 0 : 0) +
+      '"/></div></div>' +
+      '<div class="field-row"><div class="field"><label>Refusals</label><input type="number" id="sh_refusals" min="0" value="' +
+      (r ? r.refusals || 0 : 0) +
+      '"/></div><div class="field"><label>ROSC</label><input type="number" id="sh_rosc" min="0" value="' +
+      (r ? r.roscCount || 0 : 0) +
+      '"/></div></div>' +
+      '<div class="field"><label>Staff present</label><div class="shift-staff-list">' +
+      staffChecklist +
+      '</div></div>' +
+      '<div class="field"><label>Staffing shortages</label><input id="sh_shortages" value="' +
+      esc(r ? r.staffingShortages || '' : '') +
+      '" placeholder="Any gaps?"/></div>' +
+      '<div class="field"><label>Equipment issues</label><textarea id="sh_equipment" placeholder="Equipment problems">' +
+      esc(r ? r.equipmentIssues || '' : '') +
+      '</textarea><label class="shift-flag"><input type="checkbox" id="sh_flagEquip"' +
+      (r && r.flagEquipment ? ' checked' : '') +
+      '/>Flag as challenge</label></div>' +
+      '<div class="field"><label>Pending incidents</label><textarea id="sh_incidents" placeholder="Unresolved incidents">' +
+      esc(r ? r.pendingIncidents || '' : '') +
+      '</textarea><label class="shift-flag"><input type="checkbox" id="sh_flagIncident"' +
+      (r && r.flagIncidents ? ' checked' : '') +
+      '/>Flag as challenge</label></div>' +
+      '<div class="field"><label>Notes</label><textarea id="sh_notes" placeholder="Additional notes">' +
+      esc(r ? r.notes || '' : '') +
+      '</textarea></div>' +
+      '<div style="display:flex;gap:10px;margin-top:8px"><button class="btn" data-act="shift-save" data-id="' +
+      (isEdit ? esc(r.id) : '') +
+      '">Save report</button><button class="btn btn-ghost" data-act="close">Cancel</button></div>',
+  );
+}
+function saveShiftForm(id) {
+  const dateVal = $('#sh_date').value;
+  const shiftVal = $('#sh_shift').value;
+  const teamVal = $('#sh_team').value;
+  if (!dateVal || !shiftVal) {
+    toast('Date and shift required');
+    return;
+  }
+  const staffPresent = Array.from(
+    document.querySelectorAll('.shift-staff-list input[type=checkbox]:checked'),
+  ).map((cb) => cb.value);
+  const data = {
+    id: id || uid(),
+    date: dateVal,
+    shift: shiftVal,
+    team: teamVal,
+    sicName: $('#sh_sic').value.trim(),
+    casesHandled: parseInt($('#sh_cases').value) || 0,
+    transfers: parseInt($('#sh_transfers').value) || 0,
+    refusals: parseInt($('#sh_refusals').value) || 0,
+    roscCount: parseInt($('#sh_rosc').value) || 0,
+    staffPresent: staffPresent,
+    staffingShortages: $('#sh_shortages').value.trim(),
+    equipmentIssues: $('#sh_equipment').value.trim(),
+    flagEquipment: $('#sh_flagEquip').checked,
+    pendingIncidents: $('#sh_incidents').value.trim(),
+    flagIncidents: $('#sh_flagIncident').checked,
+    notes: $('#sh_notes').value.trim(),
+    linkedChallenges: [],
+    createdAt: id ? undefined : Date.now(),
+    updatedAt: Date.now(),
+  };
+  if (id) {
+    const idx = shiftReports.findIndex((x) => x.id === id);
+    if (idx >= 0) {
+      data.createdAt = shiftReports[idx].createdAt;
+      data.linkedChallenges = shiftReports[idx].linkedChallenges || [];
+      shiftReports[idx] = data;
+    }
+  } else {
+    const dup = shiftReports.find(
+      (x) => x.date === data.date && x.shift === data.shift && x.team === data.team,
+    );
+    if (dup) {
+      if (
+        !confirm(
+          'A report for ' +
+            data.shift +
+            ' Team ' +
+            data.team +
+            ' on ' +
+            fmtD(data.date) +
+            ' already exists. Overwrite?',
+        )
+      )
+        return;
+      data.id = dup.id;
+      data.createdAt = dup.createdAt;
+      data.linkedChallenges = dup.linkedChallenges || [];
+      const idx = shiftReports.findIndex((x) => x.id === dup.id);
+      shiftReports[idx] = data;
+    } else {
+      shiftReports.push(data);
+    }
+  }
+  if (data.flagEquipment && data.equipmentIssues) {
+    const ch = {
+      id: uid(),
+      date: data.date,
+      category: 'Equipment',
+      location: 'Team ' + data.team,
+      description: data.equipmentIssues,
+      priority: 'Medium',
+      owner: data.sicName,
+      status: 'Open',
+      createdAt: Date.now(),
+    };
+    challenges.push(ch);
+    saveCh();
+    data.linkedChallenges.push(ch.id);
+  }
+  if (data.flagIncidents && data.pendingIncidents) {
+    const ch = {
+      id: uid(),
+      date: data.date,
+      category: 'Field',
+      location: 'Team ' + data.team,
+      description: data.pendingIncidents,
+      priority: 'High',
+      owner: data.sicName,
+      status: 'Open',
+      createdAt: Date.now(),
+    };
+    challenges.push(ch);
+    saveCh();
+    data.linkedChallenges.push(ch.id);
+  }
+  saveShiftR();
+  closeSheet();
+  renderShift();
+  toast(id ? 'Report updated' : 'Report filed');
+}
+function viewShift(id) {
+  const r = shiftReports.find((x) => x.id === id);
+  if (!r) return;
+  const staffNames = (r.staffPresent || [])
+    .map((sid) => {
+      const s = STAFF.find((x) => x.id === sid);
+      return s ? dispName(s.name) : sid;
+    })
+    .join(', ');
+  openSheet(
+    'Shift report',
+    det('Date', fmtD(r.date)) +
+      det('Shift', r.shift) +
+      det('Team', 'Team ' + r.team) +
+      det('SIC', esc(r.sicName || '\u2014')) +
+      det('Cases handled', r.casesHandled || 0) +
+      det('Transfers', r.transfers || 0) +
+      det('Refusals', r.refusals || 0) +
+      det('ROSC', r.roscCount || 0) +
+      det('Staff present', esc(staffNames || '\u2014')) +
+      det('Shortages', esc(r.staffingShortages || '\u2014')) +
+      det('Equipment issues', esc(r.equipmentIssues || '\u2014')) +
+      det('Pending incidents', esc(r.pendingIncidents || '\u2014')) +
+      det('Notes', esc(r.notes || '\u2014')) +
+      (r.linkedChallenges && r.linkedChallenges.length
+        ? det('Linked challenges', r.linkedChallenges.length + ' challenge(s)')
+        : '') +
+      '<div style="display:flex;gap:10px;margin-top:14px"><button class="btn" data-act="shift-edit" data-id="' +
+      esc(r.id) +
+      '">Edit</button><button class="btn btn-ghost" style="color:var(--red)" data-act="shift-del" data-id="' +
+      esc(r.id) +
+      '">Delete</button></div>',
+  );
+}
+function delShift(id) {
+  if (!confirm('Delete this shift report?')) return;
+  shiftReports = shiftReports.filter((x) => x.id !== id);
+  saveShiftR();
+  closeSheet();
+  renderShift();
+  toast('Deleted');
+}
+
 function editChallenge(id) {
   const c = id
     ? challenges.filter((x) => x.id === id)[0]
@@ -2345,6 +2724,21 @@ function exportAllExcel() {
         Status: certStatus(d),
       }));
     }),
+    'Shift Reports': shiftReports.map((r) => ({
+      Date: r.date,
+      Shift: r.shift,
+      Team: r.team,
+      SIC: r.sicName,
+      'Cases Handled': r.casesHandled || 0,
+      Transfers: r.transfers || 0,
+      Refusals: r.refusals || 0,
+      ROSC: r.roscCount || 0,
+      'Staff Present': (r.staffPresent || []).length,
+      Shortages: r.staffingShortages || '',
+      'Equipment Issues': r.equipmentIssues || '',
+      Incidents: r.pendingIncidents || '',
+      Notes: r.notes || '',
+    })),
   });
   toast('Exported to Excel');
 }
@@ -2353,17 +2747,22 @@ function resetSample() {
   seedSample(true);
 }
 function clearAll() {
-  if (!confirm('Clear ALL records (reports, challenges, achievements, initiatives)?')) return;
+  if (
+    !confirm('Clear ALL records (reports, challenges, achievements, initiatives, shift reports)?')
+  )
+    return;
   reports = [];
   challenges = [];
   achievements = [];
   initiatives = [];
   certifications = [];
+  shiftReports = [];
   saveRep();
   saveCh();
   saveAch();
   saveInit();
   saveCert();
+  saveShiftR();
   Store.set('dcas_seeded', '1');
   go('dashboard');
   toast('All records cleared');
@@ -2444,6 +2843,15 @@ const ACTIONS = {
   },
   'stf-cert': (a) => editStfCerts(a.id, a.team),
   'stf-cert-save': (a) => saveStfCerts(a.id, a.team),
+  'shift-new': () => editShift(null),
+  'shift-view': (a) => viewShift(a.id),
+  'shift-edit': (a) => editShift(a.id),
+  'shift-del': (a) => delShift(a.id),
+  'shift-save': (a) => saveShiftForm(a.id || ''),
+  'shift-filter': (a) => {
+    shiftFilter = a.key;
+    renderShift();
+  },
 };
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-act]');
@@ -2462,6 +2870,7 @@ $('#fileIn').addEventListener('change', (e) => {
   'chSearch|renderChallenges',
   'achSearch|renderAch',
   'initSearch|renderInit',
+  'shiftSearch|renderShift',
 ].forEach((p) => {
   const id = p.split('|')[0],
     fn = {
@@ -2469,6 +2878,7 @@ $('#fileIn').addEventListener('change', (e) => {
       renderChallenges: renderChallenges,
       renderAch: renderAch,
       renderInit: renderInit,
+      renderShift: renderShift,
     }[p.split('|')[1]];
   $('#' + id).addEventListener('input', deb(fn, 150));
 });

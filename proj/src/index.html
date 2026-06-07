@@ -138,6 +138,7 @@
         </button>
       </div>
       <div class="liveband" id="liveband"></div>
+      <div id="shiftNudge"></div>
       <div class="sec-h">
         <h2 style="font-size: 16px">Management overview</h2>
         <span class="sub" id="repMonthLbl"></span>
@@ -303,6 +304,21 @@
       <div id="chList"></div>
     </main>
 
+    <main id="view-shift" class="view">
+      <div class="sec-h">
+        <h2>Shift Reports</h2>
+        <span class="sub" id="shiftCount"></span>
+      </div>
+      <div class="searchbar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="7" />
+          <path d="m21 21-4.3-4.3" /></svg
+        ><input id="shiftSearch" placeholder="Search shift reports&hellip;" />
+      </div>
+      <div class="chips" id="shiftChips"></div>
+      <div id="shiftList"></div>
+    </main>
+
     <main id="view-more" class="view">
       <div class="sec-h"><h2>More</h2></div>
       <div class="menu-label">Operations</div>
@@ -342,6 +358,25 @@
         <div>
           <div class="mi-t">Monthly Reports</div>
           <div class="mi-d">Cases, response time, ROSC</div>
+        </div>
+        <span class="chev">&rsaquo;</span>
+      </button>
+      <button class="menu-item" data-act="go" data-v="shift">
+        <div class="mi-ic" style="background: var(--amber-soft); color: var(--amber)">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 6v6l4 2" />
+          </svg>
+        </div>
+        <div>
+          <div class="mi-t">Shift Reports</div>
+          <div class="mi-d">End-of-shift operational logs</div>
         </div>
         <span class="chev">&rsaquo;</span>
       </button>
