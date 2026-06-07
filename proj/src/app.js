@@ -905,13 +905,17 @@ function renderRoster() {
       duty.length +
       ' staff on duty</p>' +
       duty
-        .map(
-          (s) =>
+        .map((s) => {
+          const isSup = s.callsign === 'Supervisor';
+          const bg = isSup ? 'var(--red-soft)' : 'var(--night-soft)';
+          return (
             '<div class="staff-row" style="padding:8px 0;border-top:1px solid var(--line)" data-act="staff" data-id="' +
             esc(s.id) +
             '" data-team="' +
             esc(s.team) +
-            '"><span class="callsign" style="font-size:11px;padding:4px 7px">' +
+            '"><span class="callsign" style="font-size:11px;padding:4px 7px;background:' +
+            bg +
+            '">' +
             esc(s.callsign) +
             '</span><div class="info"><div class="nm" style="font-size:13.5px">' +
             esc(dispName(s.name)) +
@@ -923,8 +927,9 @@ function renderRoster() {
             shiftOn(s, day) +
             '">' +
             CODES[shiftOn(s, day)].l +
-            '</span></div>',
-        )
+            '</span></div>'
+          );
+        })
         .join('')
     : '<p style="color:var(--muted);font-size:13.5px;margin:4px 2px">No staff on duty this day.</p>';
 }
@@ -1251,6 +1256,16 @@ function renderChallenges() {
         '</div></div>',
     )
     .join('');
+  const byCat = {};
+  challenges.forEach((c) => (byCat[c.category] = (byCat[c.category] || 0) + 1));
+  const catData = Object.entries(byCat)
+    .map(([k, v]) => ({ x: k, y: v }))
+    .sort((a, b) => b.y - a.y);
+  $('#chChart').innerHTML = catData.length
+    ? '<div class="card"><div class="card-h">By category</div>' +
+      barChart(catData, 'var(--amber)') +
+      '</div>'
+    : '';
   const chips = [{ k: 'all', t: 'All' }]
     .concat(CH_STATUS.map((s) => ({ k: s, t: s })))
     .concat(PRIOS.map((p) => ({ k: p, t: p })));
@@ -2230,6 +2245,16 @@ const I_ST = [
 const iSt = (k) => I_ST.filter((s) => s.k === k)[0] || I_ST[0];
 function renderInit() {
   const q = ($('#initSearch').value || '').trim().toLowerCase();
+  const bySt = {};
+  initiatives.forEach((i) => (bySt[i.status] = (bySt[i.status] || 0) + 1));
+  const stData = Object.entries(bySt)
+    .map(([k, v]) => ({ x: k, y: v }))
+    .sort((a, b) => b.y - a.y);
+  $('#initChart').innerHTML = stData.length
+    ? '<div class="card"><div class="card-h">By status</div>' +
+      barChart(stData, 'var(--night)') +
+      '</div>'
+    : '';
   $('#initChips').innerHTML = [{ k: 'all', t: 'All' }]
     .concat(I_ST)
     .map(
