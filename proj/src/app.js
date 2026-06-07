@@ -536,7 +536,7 @@ function renderDashboard() {
       : '');
 
   const todayStr = today();
-  const todayShift = new Date().getHours() < 14 ? 'Day' : 'Night';
+  const todayShift = (new Date().getHours() >= 5 && new Date().getHours() < 16) ? 'Day' : 'Night';
   const hasTodayReport = shiftReports.some((r) => r.date === todayStr && r.shift === todayShift);
   $('#shiftNudge').innerHTML = hasTodayReport
     ? ''
@@ -1414,7 +1414,7 @@ function editShift(id) {
   const r = id ? shiftReports.filter((x) => x.id === id)[0] : null;
   const isEdit = !!r;
   const dateVal = r ? r.date : today();
-  const shiftVal = r ? r.shift : new Date().getHours() < 14 ? 'Day' : 'Night';
+  const shiftVal = r ? r.shift : (new Date().getHours() >= 5 && new Date().getHours() < 16) ? 'Day' : 'Night';
   const teamVal = r ? r.team : teamOnShift(dateVal, shiftVal === 'Day' ? 'D' : 'N');
   const onDuty = onDutyFor(dateVal, shiftVal === 'Day' ? 'D' : 'N');
   const sicRecord = STAFF.find((s) => s.team === teamVal && s.isSupervisor);
