@@ -5,7 +5,7 @@ import { esc, deb, dateOf, dispName, initials, telOf, uid, today, fmtD } from '.
 const $ = (s) => document.querySelector(s);
 const TODAY = Math.min(new Date().getDate(), 30);
 let day = TODAY,
-  view = 'dashboard';
+  view = sessionStorage.getItem('dcas_view') || 'dashboard';
 let stfFilter = 'all',
   chFilter = 'all',
   achFilter = 'all',
@@ -251,6 +251,7 @@ function toast(m) {
 /* ===== navigation ===== */
 function go(v) {
   view = v;
+  sessionStorage.setItem('dcas_view', v);
   document.querySelectorAll('.view').forEach((x) => x.classList.remove('active'));
   const el = $('#view-' + v);
   if (el) el.classList.add('active');
@@ -2502,9 +2503,12 @@ function dismissInstall() {
   }
 }
 function showInstall() {
+  if (sessionStorage.getItem('dcas_install_shown')) return;
+  if (window.matchMedia('(display-mode: standalone)').matches) return;
+  sessionStorage.setItem('dcas_install_shown', '1');
   ib.classList.remove('hide');
   ib.classList.add('show');
-  installTimer = setTimeout(dismissInstall, 5000);
+  installTimer = setTimeout(dismissInstall, 3000);
 }
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
@@ -2545,4 +2549,4 @@ function toggleTheme() {
     });
 })();
 
-renderDashboard();
+go(view);
