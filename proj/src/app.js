@@ -916,20 +916,22 @@ function renderRoster() {
           const bg = isSup ? 'var(--red-soft)' : 'var(--night-soft)';
           return (
             '<div class="staff-row" style="padding:8px 0;border-top:1px solid var(--line)" data-act="staff" data-id="' +
-            esc(s.id) +
-            '" data-team="' +
-            esc(s.team) +
-            '"><span class="callsign" style="font-size:11px;padding:4px 7px;background:' +
-            bg +
-            '">' +
-            esc(s.callsign) +
-            '</span><div class="info"><div class="nm" style="font-size:13.5px">' +
-            esc(dispName(s.name)) +
-            '</div><div class="sub">' +
-            esc(s.area || s.airport) +
-            ' \u00b7 Team ' +
-            s.team +
-            '</div></div><span class="scode sc-' +
+              esc(s.id) +
+              '" data-team="' +
+              esc(s.team) +
+              '"><span class="callsign" style="font-size:11px;padding:4px 7px;background:' +
+              bg +
+              '">' +
+              esc(s.callsign) +
+              '</span><div class="info"><div class="nm" style="font-size:13.5px">' +
+              esc(dispName(s.name)) +
+              '</div><div class="sub">' +
+              esc(s.area || s.airport) +
+              ' \u00b7 Team ' +
+              s.team +
+              (s.adp ? ' \u00b7 <span style="color:var(--green);font-weight:600">ADP</span>' : '') +
+              (s.tdp ? ' \u00b7 <span style="color:var(--blue);font-weight:600">TDP</span>' : '') +
+              '</div></div><span class="scode sc-' +
             shiftOn(s, day) +
             '">' +
             CODES[shiftOn(s, day)].l +
@@ -996,6 +998,8 @@ function renderStaff() {
             esc(s.title) +
             ' \u00b7 Team ' +
             s.team +
+            (s.adp ? ' \u00b7 <span style="color:var(--green);font-weight:600">ADP</span>' : '') +
+            (s.tdp ? ' \u00b7 <span style="color:var(--blue);font-weight:600">TDP</span>' : '') +
             '</div></div><span class="scode sc-' +
             c +
             '">' +
