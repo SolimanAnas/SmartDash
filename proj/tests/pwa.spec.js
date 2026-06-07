@@ -13,10 +13,13 @@ test('manifest.json is valid PWA manifest', () => {
   expect(m.display).toBe('standalone');
   expect(m.background_color).toBeTruthy();
   expect(m.theme_color).toBeTruthy();
-  expect(m.icons.length).toBeGreaterThanOrEqual(2);
-  expect(m.icons[0].sizes).toBe('192x192');
-  expect(m.icons[1].sizes).toBe('512x512');
-  expect(m.icons[1].purpose).toContain('maskable');
+  expect(m.icons.length).toBeGreaterThanOrEqual(10);
+  const has192 = m.icons.some((i) => i.sizes === '192x192');
+  const has512 = m.icons.some((i) => i.sizes === '512x512');
+  const hasMaskable = m.icons.some((i) => i.purpose?.includes('maskable'));
+  expect(has192).toBeTruthy();
+  expect(has512).toBeTruthy();
+  expect(hasMaskable).toBeTruthy();
 });
 
 test('sw.js exists with expected structure', () => {

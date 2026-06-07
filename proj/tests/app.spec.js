@@ -62,9 +62,9 @@ test('staff directory renders and is searchable', async ({ page }) => {
 
   const countBefore = await page.locator('#stfList .rec').count();
   await page.locator('#stfSearch').fill('Soliman');
-  await page.waitForTimeout(300);
-  const countAfter = await page.locator('#stfList .rec').count();
-  expect(countAfter).toBeLessThan(countBefore);
+  await expect
+    .poll(async () => page.locator('#stfList .rec').count())
+    .toBeLessThan(countBefore);
 });
 
 test('staff detail sheet shows certifications section', async ({ page }) => {
@@ -82,9 +82,8 @@ test('staff certifications editor opens and can save', async ({ page }) => {
   await page.locator('.nav button[data-v="more"]').click();
   await page.getByRole('button', { name: /Staff Directory/ }).click();
   await page.locator('#stfList .rec').first().click();
-  await page.waitForTimeout(200);
+  await expect(page.locator('#sheet')).toHaveClass(/open/);
   await page.locator('[data-act="stf-cert"]').click();
-  await page.waitForTimeout(200);
   const sheet = page.locator('#sheet');
   await expect(sheet.locator('#sheetTitle')).toContainText(/Certifications/);
   await expect(sheet.locator('button').filter({ hasText: 'Save certifications' })).toBeVisible();

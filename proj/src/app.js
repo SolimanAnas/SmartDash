@@ -327,8 +327,7 @@ function stationsList() {
     m[k].crew.push(s);
   });
   return Object.values(m).sort(
-    (a, b) =>
-      (UNIT_ORDER[a.callsign] || 99) - (UNIT_ORDER[b.callsign] || 99),
+    (a, b) => (UNIT_ORDER[a.callsign] || 99) - (UNIT_ORDER[b.callsign] || 99),
   );
 }
 const TERMS = [
@@ -339,9 +338,21 @@ const TERMS = [
 ];
 const normTerm = (t) => (t || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 const UNIT_ORDER = {
-  'AIRPORT 10': 1, 'AIRPORT 12': 2, 'AIRPORT 14': 3, 'AIRPORT 20': 4, 'AIRPORT 21': 5,
-  'AIRPORT 30': 6, 'AIRPORT 32': 7, 'AIRPORT 33': 8, 'AIRPORT 37': 9, 'AIRPORT 35': 10,
-  'AIRPORT 36': 11, 'AIRPORT 11': 12, 'AIRPORT 13': 13, 'AIRPORT 40': 14, 'AIRPORT 41': 15,
+  'AIRPORT 10': 1,
+  'AIRPORT 12': 2,
+  'AIRPORT 14': 3,
+  'AIRPORT 20': 4,
+  'AIRPORT 21': 5,
+  'AIRPORT 30': 6,
+  'AIRPORT 32': 7,
+  'AIRPORT 33': 8,
+  'AIRPORT 37': 9,
+  'AIRPORT 35': 10,
+  'AIRPORT 36': 11,
+  'AIRPORT 11': 12,
+  'AIRPORT 13': 13,
+  'AIRPORT 40': 14,
+  'AIRPORT 41': 15,
 };
 function terminalCoverage(d) {
   const all = stationsList();
@@ -349,7 +360,9 @@ function terminalCoverage(d) {
     const label = t[0],
       ap = t[1],
       term = t[2];
-    const sts = all.filter((s) => s.airport === ap && (term ? normTerm(s.terminal) === normTerm(term) : true));
+    const sts = all.filter(
+      (s) => s.airport === ap && (term ? normTerm(s.terminal) === normTerm(term) : true),
+    );
     let covered = 0,
       headcount = 0;
     sts.forEach((s) => {
@@ -702,7 +715,9 @@ function renderCommand() {
     : '';
 }
 function viewTerminal(ap, term) {
-  const sts = stationsList().filter((s) => s.airport === ap && (term ? normTerm(s.terminal) === normTerm(term) : true));
+  const sts = stationsList().filter(
+    (s) => s.airport === ap && (term ? normTerm(s.terminal) === normTerm(term) : true),
+  );
   const label = term || 'Al-Maktoum (DWC)';
   const issues = challenges.filter(
     (c) =>
@@ -816,7 +831,8 @@ function renderRoster() {
     })
     .join('');
   const duty = STAFF.filter((s) => isDuty(shiftOn(s, day))).sort((a, b) => {
-    const aSup = a.callsign === 'Supervisor', bSup = b.callsign === 'Supervisor';
+    const aSup = a.callsign === 'Supervisor',
+      bSup = b.callsign === 'Supervisor';
     if (aSup !== bSup) return aSup ? -1 : 1;
     return (UNIT_ORDER[a.callsign] || 99) - (UNIT_ORDER[b.callsign] || 99);
   });
