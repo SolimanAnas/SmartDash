@@ -1494,6 +1494,7 @@ function renderAnalytics() {
     ) +
     '</div>';
 }
+let _barGradId = 0;
 function barChart(data, color) {
   if (!data.length) return '<p style="color:var(--muted);font-size:13px">No data</p>';
   const W = 320,
@@ -1501,7 +1502,23 @@ function barChart(data, color) {
     pad = 24,
     gap = (W - pad * 2) / data.length,
     bw = gap * 0.6,
-    max = Math.max.apply(null, data.map((d) => d.y).concat([1]));
+    max = Math.max.apply(null, data.map((d) => d.y).concat([1])),
+    gid = 'bgrad' + _barGradId++,
+    c = color || 'var(--red)';
+  let grid = '';
+  for (let g = 1; g <= 3; g++) {
+    const gy = H - pad - (g / 4) * (H - pad * 2);
+    grid +=
+      '<line class="grid" x1="' +
+      pad +
+      '" y1="' +
+      gy.toFixed(1) +
+      '" x2="' +
+      (W - pad) +
+      '" y2="' +
+      gy.toFixed(1) +
+      '"/>';
+  }
   let bars = '',
     labels = '';
   data.forEach((d, i) => {
@@ -1509,7 +1526,9 @@ function barChart(data, color) {
       x = pad + i * gap + (gap - bw) / 2,
       y = H - pad - h;
     bars +=
-      '<rect x="' +
+      '<rect class="bar bar-anim" style="--bi:' +
+      i +
+      '" x="' +
       x.toFixed(1) +
       '" y="' +
       y.toFixed(1) +
@@ -1517,14 +1536,14 @@ function barChart(data, color) {
       bw.toFixed(1) +
       '" height="' +
       h.toFixed(1) +
-      '" rx="3" fill="' +
-      (color || 'var(--red)') +
-      '"/>';
+      '" rx="4" fill="url(#' +
+      gid +
+      ')"/>';
     bars +=
-      '<text x="' +
+      '<text class="bar-val" x="' +
       (x + bw / 2).toFixed(1) +
       '" y="' +
-      (y - 4).toFixed(1) +
+      (y - 5).toFixed(1) +
       '" text-anchor="middle">' +
       d.y +
       '</text>';
@@ -1542,7 +1561,15 @@ function barChart(data, color) {
     W +
     ' ' +
     H +
-    '" preserveAspectRatio="xMidYMid meet"><line class="axis" x1="' +
+    '" preserveAspectRatio="xMidYMid meet"><defs><linearGradient id="' +
+    gid +
+    '" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="' +
+    c +
+    '" stop-opacity="0.92"/><stop offset="100%" stop-color="' +
+    c +
+    '" stop-opacity="0.55"/></linearGradient></defs>' +
+    grid +
+    '<line class="axis" x1="' +
     pad +
     '" y1="' +
     (H - pad) +
@@ -1567,33 +1594,67 @@ function sparkline(data) {
     rng = max - min || 1;
   const px = (i) => pad + i * ((W - pad * 2) / (data.length - 1)),
     py = (v) => H - pad - ((v - min) / rng) * (H - pad * 2);
-  const pts = data.map((d, i) => px(i).toFixed(1) + ',' + py(d.y).toFixed(1)).join(' ');
-  const area = pad + ',' + (H - pad) + ' ' + pts + ' ' + (W - pad) + ',' + (H - pad);
-  const dots = data
+  let grid = '';
+  for (let g = 1; g <= 2; g++) {
+    const gy = H - pad - (g / 3) * (H - pad * 2);
+    grid +=
+      '<line class="grid" x1="' +
+      pad +
+      '" y1="' +
+      gy.toFixed(1) +
+      '" x2="' +
+      (W - pad) +
+      '" y2="' +
+      gy.toFixed(1) +
+      '"/>';
+  }
+  const pts = data.map((d, i) => ({ x: px(i), y: py(d.y) }));
+  let d = 'M' + pts[0].x.toFixed(1) + ',' + pts[0].y.toFixed(1);
+  for (let i = 1; i < pts.length; i++) {
+    const p = pts[i - 1],
+      c = pts[i],
+      tx = (c.x - p.x) / 3;
+    d +=
+      ' C' +
+      (p.x + tx).toFixed(1) +
+      ',' +
+      p.y.toFixed(1) +
+      ' ' +
+      (c.x - tx).toFixed(1) +
+      ',' +
+      c.y.toFixed(1) +
+      ' ' +
+      c.x.toFixed(1) +
+      ',' +
+      c.y.toFixed(1);
+  }
+  const areaD = d + ' L' + (W - pad) + ',' + (H - pad) + ' L' + pad + ',' + (H - pad) + ' Z';
+  const totalLen = 800;
+  const dots = pts
     .map(
-      (d, i) =>
-        '<circle cx="' +
-        px(i).toFixed(1) +
+      (p, i) =>
+        '<circle class="spark-dot" cx="' +
+        p.x.toFixed(1) +
         '" cy="' +
-        py(d.y).toFixed(1) +
-        '" r="3" fill="var(--red)"/><text x="' +
-        px(i).toFixed(1) +
+        p.y.toFixed(1) +
+        '" r="4" fill="var(--red)" stroke="var(--surface)" stroke-width="2"/><text x="' +
+        p.x.toFixed(1) +
         '" y="' +
-        (py(d.y) - 8).toFixed(1) +
+        (p.y - 10).toFixed(1) +
         '" text-anchor="middle">' +
-        d.y +
+        data[i].y +
         '</text>',
     )
     .join('');
   const labels = data
     .map(
-      (d, i) =>
+      (dd, i) =>
         '<text x="' +
         px(i).toFixed(1) +
         '" y="' +
         (H - 8) +
         '" text-anchor="middle">' +
-        esc(d.x) +
+        esc(dd.x) +
         '</text>',
     )
     .join('');
@@ -1602,10 +1663,16 @@ function sparkline(data) {
     W +
     ' ' +
     H +
-    '" preserveAspectRatio="xMidYMid meet"><polygon class="sparkfill" points="' +
-    area +
-    '"/><polyline class="spark" points="' +
-    pts +
+    '" preserveAspectRatio="xMidYMid meet"><defs><linearGradient id="sgrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--red)" stop-opacity="0.22"/><stop offset="100%" stop-color="var(--red)" stop-opacity="0.02"/></linearGradient></defs>' +
+    grid +
+    '<path class="spark-area" d="' +
+    areaD +
+    '" fill="url(#sgrad)"/><path class="spark-line" d="' +
+    d +
+    '" stroke-dasharray="' +
+    totalLen +
+    '" stroke-dashoffset="' +
+    totalLen +
     '"/>' +
     dots +
     labels +
