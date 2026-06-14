@@ -543,13 +543,7 @@ function renderDashboard() {
   const todayShift = h >= 5 && h < 16 ? 'Day' : 'Night';
   const shiftActive = todayShift === 'Day' ? h >= 14 : h >= 3 || h < 5;
   const hasTodayReport = shiftReports.some((r) => r.date === todayStr && r.shift === todayShift);
-  $('#shiftNudge').innerHTML = hasTodayReport || !shiftActive
-    ? ''
-    : '<div class="shift-nudge"><div class="shift-nudge-body"><span class="shift-nudge-icon">\u26a0</span><div><div class="shift-nudge-t">End-of-shift report due</div><div class="shift-nudge-d">' +
-      todayShift +
-      ' shift \u00b7 ' +
-      fmtD(todayStr) +
-      '</div></div></div><button class="shift-nudge-btn" data-act="shift-new">File report \u2192</button></div>';
+  $('#shiftNudge').innerHTML = '';
 
   const r = latestReport(),
     p = prevReport();
