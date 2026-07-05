@@ -986,7 +986,9 @@ function renderStaff() {
             esc(initials(s.name)) +
             '</div><div class="info"><div class="nm">' +
             esc(dispName(s.name)) +
-            '</div><div class="sub"><span class="mono">' +
+            '</div><div class="sub"><span class="mono">#' +
+            esc(s.id) +
+            '</span> \u00b7 <span class="mono">' +
             esc(s.callsign) +
             '</span> \u00b7 ' +
             esc(s.title) +
@@ -2532,13 +2534,12 @@ function importRoster(wb) {
   }
   const AIR = { 'Dubai International Airport': 'DXB', 'Al-Maktoum Airport': 'DWC' };
   const SEC = [
-    'RELIEVERS',
-    'RELIEVERS from Other Areas',
     'Overtime',
     'Swap',
     'ANNUAL LEAVES',
     'SPECIAL DUTY',
   ];
+  const REL = ['RELIEVERS', 'RELIEVERS from Other Areas'];
   const out = [];
   dotted.forEach((sn) => {
     const team = sn.replace(/\./g, '');
@@ -2564,7 +2565,8 @@ function importRoster(wb) {
         airport = AIR[c[0]];
         supp = false;
       }
-      if (SEC.indexOf(c[0]) >= 0) supp = true;
+      if (SEC.indexOf(c[0]) >= 0) { supp = true; return; }
+      if (REL.indexOf(c[0]) >= 0) { term = ''; area = ''; cs = ''; return; }
       if (supp) return;
       if (c[0] && !AIR[c[0]]) term = c[0];
       if (c[1]) area = c[1];
