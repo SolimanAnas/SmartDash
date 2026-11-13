@@ -132,9 +132,39 @@ test('scanned QR link opens the verification card', async ({ page }) => {
   const sheet = page.locator('#sheet');
   await expect(sheet).toHaveClass(/open/);
   await expect(sheet.locator('#sheetTitle')).toHaveText('Verify medic');
-  await expect(sheet.locator('.vf-src')).toContainText('Badge snapshot issued 01/11/2026');
-  await expect(sheet.locator('.vf-status')).toContainText('NOT READY');
-  await expect(sheet.locator('.vf-status')).toContainText('BLS expired');
+  // No record on this device: the badge must not be able to claim readiness on its own.
+  await expect(sheet.locator('.vf-status')).toContainText('CANNOT VERIFY');
+  await expect(sheet.locator('.vf-status')).toContainText('issued 01/11/2026');
+  await expect(sheet.locator('.vf-row')).toHaveCount(0);
+  await expect(sheet).not.toContainText('READY FOR DUTY');
+});
+
+test('scanned QR link is checked against the live record when present', async ({ page }) => {
+  const payload = encodeVerify({
+    id: '0010',
+    team: 'A',
+    title: 'EMT',
+    name: 'Staff 010',
+    asOf: '2026-11-01',
+    exps: { dha: '2099-01-01' },
+  });
+  await page.goto('/?scan=2#verify=' + payload);
+  const sheet = page.locator('#sheet');
+  await expect(sheet.locator('.vf-src')).toContainText('Live record on this device');
+  await expect(sheet.locator('.vf-status')).toContainText('FOR DUTY');
+});
+
+test('demo documents are labelled and can be removed', async ({ page }) => {
+  await page.locator('.nav button[data-v="more"]').click();
+  await page.locator('#view-more [data-act="go"][data-v="docs"]').click();
+  await expect(page.locator('#docsDemo .demo-note')).toContainText('demo data');
+  page.once('dialog', (d) => d.accept());
+  await page.locator('[data-act="docs-clear-demo"]').click();
+  await expect(page.locator('#docsDemo .demo-note')).toHaveCount(0);
+  const left = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('dcas_cert') || '[]').filter((r) => r.sample),
+  );
+  expect(left).toHaveLength(0);
 });
 
 test('documents & alerts view lists predictive expiry alerts', async ({ page }) => {

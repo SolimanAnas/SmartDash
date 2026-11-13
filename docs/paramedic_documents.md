@@ -42,9 +42,12 @@ Definitions live in `proj/src/docs.js` (`DOC_DEFS`); adding a document is one li
   licenses & accreditations, personal documents and **required refresher courses**, each with status.
 - In-app: *Documents & Alerts → Verify medic* scans with the camera where the browser supports it,
   or looks the medic up by staff ID.
-- Privacy & integrity: the status snapshot travels in the link's `#fragment`, which browsers never send
-  to a server. On a device that holds SmartDash records, the **live record** is shown and an
-  out-of-date badge is flagged; otherwise the badge snapshot is shown and labelled as unconfirmed.
+- Privacy: the status snapshot travels in the link's `#fragment`, which browsers never send to a
+  server, and it **never includes personal documents** (Emirates ID, passport, visa) — anyone who
+  scans a badge can read its payload. Personal documents stay in the app only.
+- Integrity: badges are not signed, so a badge alone proves nothing. On a device that holds
+  SmartDash records the **live record** is shown and an out-of-date badge is flagged. On any other
+  device the card says **Cannot verify on this device** and shows no verdict or badge contents.
 
 ## 4. Shift readiness heatmap
 
@@ -60,7 +63,15 @@ Definitions live in `proj/src/docs.js` (`DOC_DEFS`); adding a document is one li
   Driving Permit, Airport Permit, Emirates ID, Residence Visa. Unticked items are still tracked and
   alerted.
 
-## 5. Bulk data entry (Excel)
+## 5. Demo documents
+
+New installs (and installs that predate this module) get sample document records for the
+anonymised roster so the screens are not empty. These are flagged `sample` and are never shown as
+real: *Documents & Alerts* and *Shift Readiness* show a banner with **Remove demo documents**, the
+staff profile labels them, and uploading a real roster removes them automatically. Saving or
+importing a medic's documents turns that record into a real one.
+
+## 6. Bulk data entry (Excel)
 
 Upload Center → **Upload Staff Documents**. *Download template* produces a workbook prefilled with
 the roster and current records, so it round-trips:
@@ -69,7 +80,7 @@ the roster and current records, so it round-trips:
   dates; `N/A` where allowed). Blank cells leave the record unchanged.
 - `Qualifications` and `Training` — one row per entry; replaces that medic's list.
 
-## 6. Limits of the current (client-only) architecture
+## 7. Limits of the current (client-only) architecture
 
 Everything stays on the device, per the platform's privacy rules. Fully automatic delivery to each
 medic's own phone, and cryptographically signed badges, need the sanctioned backend; the alert log
