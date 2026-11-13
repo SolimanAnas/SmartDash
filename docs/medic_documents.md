@@ -1,6 +1,6 @@
-# Paramedic Documents, Expiry Alerts, QR Profile & Shift Readiness
+# Medic Documents, Expiry Alerts, QR Profile & Shift Readiness
 
-_Feature reference for the paramedic data documentation module in SmartDash._
+_Feature reference for the medic data documentation module in SmartDash._
 
 ---
 

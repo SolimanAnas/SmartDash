@@ -1,5 +1,5 @@
 /*
- * Paramedic documents & readiness — pure logic (no DOM, no storage).
+ * Medic documents & readiness — pure logic (no DOM, no storage).
  *
  * A staff record stores raw values per document key in `certs`:
  *   - expiry documents:   'YYYY-MM-DD' (expiry date)
