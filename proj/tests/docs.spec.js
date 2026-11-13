@@ -123,8 +123,26 @@ test('QR verification payload round-trips', () => {
   expect(back.team).toBe('A');
   expect(back.asOf).toBe('2026-11-13');
   expect(back.name).toBe('Staff-002 Ä');
-  expect(back.exps).toEqual(exps);
+  const shared = Object.assign({}, exps);
+  delete shared.eid;
+  delete shared.passport;
+  delete shared.visa;
+  expect(back.exps).toEqual(shared);
   expect(decodeVerify('garbage')).toBe(null);
+});
+
+test('QR payload never carries personal documents', () => {
+  const back = decodeVerify(
+    encodeVerify({
+      id: '0002',
+      team: 'A',
+      title: 'EMT',
+      name: 'Staff 002',
+      asOf: '2026-11-13',
+      exps: { dha: '2027-01-01', eid: '2027-02-02', passport: '2030-03-03', visa: 'na' },
+    }),
+  );
+  expect(back.exps).toEqual({ dha: '2027-01-01' });
 });
 
 test('sample documents are deterministic per staff member', () => {

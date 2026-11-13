@@ -167,8 +167,14 @@ const b36d = (iso) =>
 const fromB36d = (s) => isoOfUtc(EPOCH + parseInt(s, 36) * 86400000);
 const clean = (s) => encodeURIComponent(String(s == null ? '' : s).replace(/~/g, '-'));
 
+/*
+ * Personal documents (Emirates ID, passport, visa) never go into a QR badge: anyone who scans it
+ * can read the payload, and a visa marked N/A would reveal nationality. They stay in the app only.
+ */
+export const QR_DEFS = DOC_DEFS.filter((d) => d.g !== 'personal');
+
 export function encodeVerify(p) {
-  const docs = DOC_DEFS.map((d) => {
+  const docs = QR_DEFS.map((d) => {
     const e = (p.exps || {})[d.k];
     return e ? d.c + (e === 'na' ? '---' : b36d(e)) : '';
   }).join('');
@@ -183,7 +189,7 @@ export function decodeVerify(str) {
     const exps = {},
       docs = parts[5];
     for (let i = 0; i + 4 <= docs.length; i += 4) {
-      const def = DOC_DEFS.filter((d) => d.c === docs[i])[0];
+      const def = QR_DEFS.filter((d) => d.c === docs[i])[0];
       const v = docs.slice(i + 1, i + 4);
       if (def) exps[def.k] = v === '---' ? 'na' : fromB36d(v);
     }

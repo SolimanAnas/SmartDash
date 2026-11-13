@@ -18,6 +18,7 @@ import {
   decodeVerify,
   verifyPayloadFrom,
   sampleDossier,
+  QR_DEFS,
 } from './docs.js';
 
 /* ===== utilities ===== */
@@ -1330,7 +1331,10 @@ function docsSection(s) {
   const a = staffAssess(s);
   const rec = getStaffCerts(s.id, s.team) || {};
   return {
-    banner: readyBanner(a),
+    banner:
+      (rec.sample
+        ? '<div class="vf-src warn">Demo documents \u2014 sample data, not this medic\u2019s real records</div>'
+        : '') + readyBanner(a),
     body:
       DOC_GROUPS.map((g) =>
         det(
@@ -1592,7 +1596,7 @@ function viewQr(id, team) {
       '" data-team="' +
       esc(s.team) +
       '">Copy link</button></div>' +
-      '<p class="hint">Supervisors scan this code with any phone camera (or <b>Verify medic</b> in Documents &amp; Alerts) to check readiness, accreditations and refresher courses instantly. Status data travels in the link’s #fragment, which is never sent to a server. A device holding SmartDash records always shows the live record; re-issue the badge after renewals.</p>',
+      '<p class="hint">Supervisors scan this code with any phone camera (or <b>Verify medic</b> in Documents &amp; Alerts) to check readiness, accreditations and refresher courses instantly. Status data travels in the link’s #fragment, which is never sent to a server, and personal documents (Emirates ID, passport, visa) are never included. Only a device holding SmartDash records can verify a badge; re-issue it after renewals.</p>',
   );
 }
 function downloadQrPng(id, team) {
@@ -1647,9 +1651,22 @@ function showVerify(p, manual) {
   const live = !!s && hasRecord(s);
   const subject = s || { id: p.id, team: p.team, title: p.title, name: p.name };
   const exps = live ? expsOf(s) : p.exps;
+  if (!live && !manual) {
+    openSheet(
+      'Verify medic',
+      vfHeader(subject) +
+        '<div class="vf-status bad"><b>\u2715 CANNOT VERIFY ON THIS DEVICE</b><span>No SmartDash record for #' +
+        esc(subject.id) +
+        ' on this device. Badge contents are not shown because a badge alone cannot prove readiness.</span><span class="vf-asof">Badge issued ' +
+        fmtD(p.asOf) +
+        '</span></div>' +
+        '<p class="hint">Scan again on a supervisor device that holds DCAS records, or check the original licenses and documents.</p>',
+    );
+    return;
+  }
   let diffs = 0;
   if (live && !manual)
-    DOC_DEFS.forEach((d) => {
+    QR_DEFS.forEach((d) => {
       if ((p.exps[d.k] || '') !== (exps[d.k] || '')) diffs++;
     });
   const src = manual
@@ -3223,6 +3240,32 @@ function alertRow(a, i) {
     '</div></div>'
   );
 }
+/* Demo document records (seeded for the anonymised roster) must never pass for real ones. */
+const demoDocCount = () => certifications.filter((r) => r.sample).length;
+function demoNote() {
+  const n = demoDocCount();
+  return n
+    ? '<div class="vf-src warn demo-note"><span>' +
+        n +
+        ' staff document record' +
+        (n > 1 ? 's are' : ' is') +
+        ' demo data, not real records. Readiness and alerts below include them.</span><button class="btn btn-ghost btn-sm" data-act="docs-clear-demo">Remove demo documents</button></div>'
+    : '';
+}
+function removeDemoDocs() {
+  const n = demoDocCount();
+  if (!n) return 0;
+  certifications = certifications.filter((r) => !r.sample);
+  saveCert();
+  runAlertEngine();
+  return n;
+}
+function clearDemoDocs() {
+  if (!confirm('Remove all demo document records? Real records are kept.')) return;
+  const n = removeDemoDocs();
+  toast(n + ' demo record' + (n === 1 ? '' : 's') + ' removed');
+  go(view);
+}
 function renderDocs() {
   const asOf = nowISO();
   const all = currentAlerts(asOf);
@@ -3231,6 +3274,7 @@ function renderDocs() {
   const readyNow = STAFF.filter((s) => staffAssess(s, asOf).ready).length;
   const pct = STAFF.length ? Math.round((readyNow / STAFF.length) * 100) : 0;
   $('#docsCount').textContent = alerts.length + ' active alerts';
+  $('#docsDemo').innerHTML = demoNote();
   $('#docsKpis').innerHTML = [
     [
       pct + '<span class="kpi-unit">%</span>',
@@ -3407,6 +3451,7 @@ function viewShiftReady(d, code) {
 function renderReadiness() {
   const days = ROSTER.days || 30;
   $('#rdyMonth').textContent = ROSTER.month;
+  $('#rdyDemo').innerHTML = demoNote();
   const grid = {},
     all = [];
   for (let d = 1; d <= days; d++) {
@@ -3738,7 +3783,13 @@ function importRoster(wb) {
     }, {}),
   ).sort();
   Store.set('dcas_roster', JSON.stringify({ staff: out, teams: ROSTER.teams }));
-  toast(out.length + ' staff loaded from Excel');
+  _expCache = null;
+  const demo = removeDemoDocs();
+  toast(
+    out.length +
+      ' staff loaded from Excel' +
+      (demo ? ' \u00b7 ' + demo + ' demo document records removed' : ''),
+  );
   go('roster');
 }
 function importReports(wb) {
@@ -4199,6 +4250,7 @@ const ACTIONS = {
   notify: (a) => sendNotice(a),
   digest: (a) => sendDigest(a.team),
   'notif-enable': () => enableNotifications(),
+  'docs-clear-demo': () => clearDemoDocs(),
   'alerts-check': () => {
     runAlertEngine(true);
     renderDocs();
