@@ -1,4 +1,4 @@
-const CACHE = 'smartdash-v5';
+const CACHE = 'smartdash-v6';
 const PRECACHE = [
   'manifest.json',
   '404.html',
@@ -12,7 +12,7 @@ const PRECACHE = [
   'icons/icon-384x384.png',
   'icons/icon-512x512.png',
 ];
-const CDN_CACHE = 'smartdash-cdn-v5';
+const CDN_CACHE = 'smartdash-cdn-v6';
 const OLD_CACHES = [
   'dcas-ops-v1',
   'dcas-ops-v2',
@@ -112,6 +112,28 @@ self.addEventListener('fetch', (event) => {
         if (fallback) return fallback;
         return new Response('Offline', { status: 503 });
       }
+    })(),
+  );
+});
+
+// Document-expiry alerts: tapping a notification focuses SmartDash on Documents & Alerts.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const target = new URL(
+    (event.notification.data && event.notification.data.url) || './#docs',
+    self.registration.scope,
+  ).href;
+  event.waitUntil(
+    (async () => {
+      const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      for (const w of wins) {
+        if (w.url.indexOf(self.registration.scope) === 0 && 'focus' in w) {
+          await w.focus();
+          if ('navigate' in w) return w.navigate(target);
+          return;
+        }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(target);
     })(),
   );
 });

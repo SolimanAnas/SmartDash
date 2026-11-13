@@ -8,7 +8,8 @@ on:
 
 jobs:
   quality:
-    runs-on: ubuntu-latest
+    # Pinned: Playwright 1.60 cannot install browser dependencies on newer Ubuntu images.
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: proj
