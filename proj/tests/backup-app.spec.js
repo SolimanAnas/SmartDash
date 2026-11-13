@@ -157,3 +157,32 @@ test('adding and deleting a record is tracked for backup and merge', async ({ pa
   const tomb = await page.evaluate(() => JSON.parse(localStorage.getItem('dcas_tomb')));
   expect(Object.keys(tomb.challenges)).toContain(added.id);
 });
+
+test('upgrading an older device removes DHA data without counting it as a change', async ({
+  page,
+}) => {
+  await page.evaluate(() => {
+    localStorage.setItem('dcas_schema', '1');
+    localStorage.setItem(
+      'dcas_cert',
+      JSON.stringify([
+        {
+          staffId: '0001',
+          staffTeam: 'A',
+          certs: { dha: '2027-01-01', bls: '2027-01-01' },
+          updatedAt: 5,
+        },
+      ]),
+    );
+    localStorage.setItem('dcas_policy', JSON.stringify(['dha', 'bls']));
+    localStorage.setItem('dcas_dirty', '0');
+  });
+  await page.reload();
+  const st = await page.evaluate(() => ({
+    certs: JSON.parse(localStorage.getItem('dcas_cert'))[0].certs,
+    policy: JSON.parse(localStorage.getItem('dcas_policy')),
+    schema: localStorage.getItem('dcas_schema'),
+    dirty: localStorage.getItem('dcas_dirty'),
+  }));
+  expect(st).toEqual({ certs: { bls: '2027-01-01' }, policy: ['bls'], schema: '2', dirty: '0' });
+});

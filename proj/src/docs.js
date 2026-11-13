@@ -24,7 +24,6 @@ export const DOC_GROUPS = [
  * na: may be marked not applicable · months: refresher validity after completion
  */
 export const DOC_DEFS = [
-  { k: 'dha', sl: 'DHA', c: 'd', g: 'license', l: 'DHA Professional License', block: 'all' },
   { k: 'bls', sl: 'BLS', c: 'b', g: 'license', l: 'BLS', block: 'all' },
   { k: 'acls', sl: 'ACLS', c: 'a', g: 'license', l: 'ACLS', block: 'adv' },
   { k: 'pals', sl: 'PALS', c: 'p', g: 'license', l: 'PALS', opt: true },
@@ -246,7 +245,7 @@ export function sampleDossier(staff, nowIso, rosterStartIso) {
     const k = pick(DOC_DEFS.filter((d) => !d.months && certs[d.k] && certs[d.k] !== 'na')).k;
     certs[k] = addDays(nowIso, pick([int(3, 15), int(16, 30), int(31, 60), int(31, 60)]));
   } else if (roll < 0.25) {
-    delete certs[pick(['dha', 'airport', 'bls'])]; // not on file
+    delete certs[pick(['airport', 'bls', 'driving'])]; // not on file
   } else if (roll < 0.28) {
     certs[pick(blocking.filter((k) => certs[k] !== 'na'))] = addDays(nowIso, -int(3, 40));
   }

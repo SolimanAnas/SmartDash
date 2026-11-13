@@ -14,7 +14,7 @@
 
 export const BACKUP_FORMAT = 'smartdash-backup';
 /** Version of the stored data layout. Bump it and add a step to migrate() when it changes. */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const COLLECTIONS = [
   { k: 'challenges', store: 'dcas_ch', sheet: 'Challenges', t: 'Challenges' },
@@ -113,6 +113,8 @@ export function sigsOf(c, list) {
 /**
  * Bring a state ({ challenges: [...], ... }) written at `from` up to SCHEMA_VERSION. Mutates.
  * v0 → v1: every record gets updatedAt (createdAt when known, else 0 = "older than any edit").
+ * v1 → v2: the DHA Professional License is dropped (not required for ambulance staff): removed
+ *          from staff documents, the readiness policy and the alert log.
  */
 export function migrate(state, from) {
   let v = from || 0;
@@ -123,6 +125,17 @@ export function migrate(state, from) {
       }),
     );
     v = 1;
+  }
+  if (v < 2) {
+    (state.certifications || []).forEach((r) => {
+      if (r.certs) delete r.certs.dha;
+    });
+    if (Array.isArray(state.policy)) state.policy = state.policy.filter((k) => k !== 'dha');
+    if (state.notifLog)
+      Object.keys(state.notifLog).forEach((k) => {
+        if (k.split('|')[2] === 'dha') delete state.notifLog[k];
+      });
+    v = 2;
   }
   return state;
 }

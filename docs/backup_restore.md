@@ -62,5 +62,6 @@ The app also asks the browser to protect its storage from automatic clearing
 - Every save goes through `persist(collection)`, which compares each record with its stored
   signature (`dcas_sigs`): changed records get `updatedAt`, deleted ones a tombstone (`dcas_tomb`),
   and real changes increase `dcas_dirty`.
-- `dcas_schema` holds the stored data version. When the data layout changes, bump
+- `dcas_schema` holds the stored data version (v2 removed the DHA license, which ambulance
+  staff don't hold). When the data layout changes, bump
   `SCHEMA_VERSION` and add a step to `migrate()`; old devices and old backups upgrade themselves.

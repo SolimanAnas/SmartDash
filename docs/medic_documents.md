@@ -11,7 +11,7 @@ privileges lapses unnoticed:
 
 | Group | Documents | Stored as |
 |---|---|---|
-| **Licenses & accreditations** | DHA Professional License, BLS, ACLS, PALS, PHTLS, Driving Permit, Airport Permit | expiry date |
+| **Licenses & accreditations** | BLS, ACLS, PALS, PHTLS, Driving Permit, Airport Permit | expiry date |
 | **Personal documents** | Emirates ID / national ID, Passport, Residence Visa (N/A for UAE nationals) | expiry date or N/A |
 | **Refresher courses** | CPR & AED (12 mo), Mass-casualty drill (12 mo), Infection control (12 mo), Airside safety (24 mo) | date completed → due date |
 | **Academic qualifications** | degree / diploma, institution, year, attestation status | list |
@@ -59,7 +59,7 @@ Definitions live in `proj/src/docs.js` (`DOC_DEFS`); adding a document is one li
   *Shift Readiness* screen (calendar heatmap, month average, lowest shifts, documents blocking
   readiness). Tapping any shift lists the medics who are not ready and why, plus anyone lapsing
   within 15 days.
-- **Policy** (Settings → Shift readiness policy). Default: DHA license, BLS, ACLS (EMT-A & SIC only),
+- **Policy** (Settings → Shift readiness policy). Default: BLS, ACLS (EMT-A & SIC only),
   Driving Permit, Airport Permit, Emirates ID, Residence Visa. Unticked items are still tracked and
   alerted.
 

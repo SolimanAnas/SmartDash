@@ -60,7 +60,7 @@ const fullState = () => ({
     {
       staffId: '0002',
       staffTeam: 'A',
-      certs: { dha: '2027-01-01', visa: 'na', ref_cpr: '2026-05-01' },
+      certs: { airport: '2027-01-01', visa: 'na', ref_cpr: '2026-05-01' },
       quals: [{ title: 'BSc', inst: 'College', year: '2015', attested: true }],
       training: [],
       updatedAt: 1762000000000,
@@ -79,8 +79,8 @@ const fullState = () => ({
     },
   ],
   tombstones: { challenges: { old1: 1761000000000 } },
-  notifLog: { 'A|0002|dha|2027-01-01|60': { at: 1762000000000, medic: 1762000001000 } },
-  policy: ['dha', 'bls'],
+  notifLog: { 'A|0002|airport|2027-01-01|60': { at: 1762000000000, medic: 1762000001000 } },
+  policy: ['airport', 'bls'],
   roster: {
     staff: [{ id: '0001', team: 'A', name: 'Staff 001', shifts: ['D', 'N', 'X'] }],
     teams: ['A'],
@@ -138,6 +138,20 @@ test('track stamps changed records, records deletions, ignores sample data', () 
   expect(list[0].updatedAt).toBe(99);
 });
 
+test('migrate v1 drops the DHA license from documents, policy and alerts', () => {
+  const s = migrate(
+    {
+      certifications: [{ staffId: '1', certs: { dha: '2027-01-01', bls: '2027-01-01' } }],
+      policy: ['dha', 'bls'],
+      notifLog: { 'A|1|dha|2027-01-01|60': { at: 1 }, 'A|1|bls|2027-01-01|60': { at: 1 } },
+    },
+    1,
+  );
+  expect(s.certifications[0].certs).toEqual({ bls: '2027-01-01' });
+  expect(s.policy).toEqual(['bls']);
+  expect(Object.keys(s.notifLog)).toEqual(['A|1|bls|2027-01-01|60']);
+});
+
 test('migrate v0 gives every record an updatedAt', () => {
   const s = migrate({ challenges: [{ id: 'a', createdAt: 7 }], reports: [{ id: 'r' }] }, 0);
   expect(s.challenges[0].updatedAt).toBe(7);
@@ -188,10 +202,10 @@ test('merge: deletions are respected in both directions, re-creation wins', () =
 
 test('merge keeps local settings, unions alert history; totals add up', () => {
   const m = merge(
-    { policy: ['dha'], notifLog: { k: { at: 5 } } },
+    { policy: ['bls'], notifLog: { k: { at: 5 } } },
     { policy: ['bls'], notifLog: { k: { at: 3, sic: 9 }, k2: { at: 1 } } },
   );
-  expect(m.policy).toEqual(['dha']);
+  expect(m.policy).toEqual(['bls']);
   expect(m.notifLog).toEqual({ k: { at: 3, sic: 9 }, k2: { at: 1 } });
   expect(Object.keys(m.stats)).toEqual(COLLECTIONS.map((c) => c.k));
   expect(statTotals(m.stats).added).toBe(0);

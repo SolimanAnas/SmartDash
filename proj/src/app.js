@@ -112,8 +112,18 @@ const listState = () => {
   return o;
 };
 if ((+Store.get('dcas_schema') || 0) < SCHEMA_VERSION) {
-  migrate(listState(), +Store.get('dcas_schema') || 0);
+  const st = Object.assign(listState(), {
+    policy: JSON.parse(Store.get('dcas_policy') || 'null'),
+    notifLog,
+  });
+  migrate(st, +Store.get('dcas_schema') || 0);
   COLLECTIONS.forEach((c) => Store.set(c.store, JSON.stringify(LISTS[c.k]())));
+  if (st.policy) {
+    policy = st.policy;
+    Store.set('dcas_policy', JSON.stringify(policy));
+  }
+  Store.set('dcas_notif', JSON.stringify(notifLog));
+  Store.del('dcas_sigs'); // re-baseline: an upgrade is not a user change
   Store.set('dcas_schema', String(SCHEMA_VERSION));
 }
 let sigStore = JSON.parse(Store.get('dcas_sigs') || 'null');

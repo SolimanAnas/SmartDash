@@ -159,7 +159,7 @@ Keys: `dcas_ch`, `dcas_rep`, `dcas_ach`, `dcas_init`, `dcas_cert` (staff documen
 
 // staff documents (dcas_cert — an array, one entry per staff member)
 { staffId, staffTeam,
-  certs: { dha, bls, acls, pals, phtls, driving, airport,      // licenses & accreditations → expiry date
+  certs: { bls, acls, pals, phtls, driving, airport,           // licenses & accreditations → expiry date
            eid, passport, visa,                               // personal documents → expiry date | 'na'
            ref_cpr, ref_mci, ref_ic, ref_air },               // refresher courses → date completed
   quals:    [{ title, inst, year, attested }],                // academic qualifications
@@ -167,7 +167,7 @@ Keys: `dcas_ch`, `dcas_rep`, `dcas_ach`, `dcas_init`, `dcas_cert` (staff documen
   sample?, updatedAt? }
 
 // notifLog (dcas_notif) — one entry per milestone raised
-{ 'A|0002|dha|2026-12-01|30': { at, medic?, sic? } }          // timestamps (ms)
+{ 'A|0002|bls|2026-12-01|30': { at, medic?, sic? } }          // timestamps (ms)
 ```
 
 Excel template columns:
@@ -204,7 +204,7 @@ Excel template columns:
 
 ## 9. Current features (done)
 
-Dashboard (live status band + document-expiry badge + shift-readiness card with 7-day strip + 6 management KPIs + response-time sparkline + coverage), Command Center (terminal status map + coverage + shift readiness for the selected shift + drill-down), Roster (4-team rotation strips + on-duty list), Challenges (CRUD + filters + stats), Shift Reports, Monthly Reports (CRUD + Excel import + template), Analytics (SVG bar/line charts), Staff Directory + Employee Portfolio (readiness banner, licenses & accreditations, personal documents, refresher courses, academic qualifications, training path, attendance, linked achievements/initiatives, tap-to-call, shift calendar), **Medic documents** (documents editor, Documents & Alerts view with 60/30/15-day predictive expiry alerts, device notifications, SMS reminders to medic/SIC and team digests, QR code profile per medic with badge download and verification by scan or staff ID, Shift Readiness heatmap with drill-down, lowest shifts and blocking documents, configurable readiness policy, Excel workbook import/export), Achievements & Initiatives (CRUD), Upload Center (drag-drop Excel: roster/report/achievement/staff documents + templates), Settings (Excel export, readiness policy, reset/clear, roadmap), PWA (manifest.json, service worker with cache-first + offline fallback + notification taps, install banner toast, 404 page), Playwright test suite (51 tests: PWA validity, QR decoding, documents logic, backup/restore, app functionality), CI/CD (GitHub Actions: lint → format check → build → test), Event delegation, hardened escaping, debounced search, esbuild build pipeline.
+Dashboard (live status band + document-expiry badge + shift-readiness card with 7-day strip + 6 management KPIs + response-time sparkline + coverage), Command Center (terminal status map + coverage + shift readiness for the selected shift + drill-down), Roster (4-team rotation strips + on-duty list), Challenges (CRUD + filters + stats), Shift Reports, Monthly Reports (CRUD + Excel import + template), Analytics (SVG bar/line charts), Staff Directory + Employee Portfolio (readiness banner, licenses & accreditations, personal documents, refresher courses, academic qualifications, training path, attendance, linked achievements/initiatives, tap-to-call, shift calendar), **Medic documents** (documents editor, Documents & Alerts view with 60/30/15-day predictive expiry alerts, device notifications, SMS reminders to medic/SIC and team digests, QR code profile per medic with badge download and verification by scan or staff ID, Shift Readiness heatmap with drill-down, lowest shifts and blocking documents, configurable readiness policy, Excel workbook import/export), Achievements & Initiatives (CRUD), Upload Center (drag-drop Excel: roster/report/achievement/staff documents + templates), Settings (Excel export, readiness policy, reset/clear, roadmap), PWA (manifest.json, service worker with cache-first + offline fallback + notification taps, install banner toast, 404 page), Playwright test suite (53 tests: PWA validity, QR decoding, documents logic, backup/restore, app functionality), CI/CD (GitHub Actions: lint → format check → build → test), Event delegation, hardened escaping, debounced search, esbuild build pipeline.
 
 ---
 
@@ -214,7 +214,7 @@ Dashboard (live status band + document-expiry badge + shift-readiness card with 
 npm run lint              # must pass (0 errors)
 npm run format:check      # must pass
 npm run build             # must succeed
-npm test                  # must pass (51 Playwright tests)
+npm test                  # must pass (53 Playwright tests)
 ```
 Then open `dist/dcas-airport-platform.html` or the built root `index.html` in a browser and click through every view + open/edit/save one record of each type. (esbuild catches syntax/import errors; Playwright covers navigation and core flows — still exercise the UI for visual regressions.)
 
