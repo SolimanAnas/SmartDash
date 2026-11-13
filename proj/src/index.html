@@ -139,6 +139,24 @@
       </div>
       <div class="liveband" id="liveband"></div>
       <div id="shiftNudge"></div>
+      <div class="card">
+        <div class="card-h">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            <path d="M9 12l2 2 4-4" /></svg
+          >Shift readiness<span class="more-l" data-act="go" data-v="readiness"
+            >Heatmap &rarr;</span
+          >
+        </div>
+        <div id="dashReady"></div>
+      </div>
       <div class="sec-h">
         <h2 style="font-size: 16px">Management overview</h2>
         <span class="sub" id="repMonthLbl"></span>
@@ -201,6 +219,24 @@
           >Coverage by terminal
         </div>
         <div id="cmdCoverage"></div>
+      </div>
+      <div class="card">
+        <div class="card-h">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            <path d="M9 12l2 2 4-4" /></svg
+          >Shift readiness<span class="more-l" data-act="go" data-v="readiness"
+            >Heatmap &rarr;</span
+          >
+        </div>
+        <div id="cmdReady"></div>
       </div>
       <div class="card" id="singleMedicCard" style="display: none">
         <div class="card-h">
@@ -315,6 +351,50 @@
         <div>
           <div class="mi-t">Staff Directory</div>
           <div class="mi-d">126 staff &middot; profiles &amp; portfolios</div>
+        </div>
+        <span class="chev">&rsaquo;</span>
+      </button>
+      <button class="menu-item" data-act="go" data-v="docs">
+        <div class="mi-ic" style="background: var(--red-soft); color: var(--red-d)">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <path d="M14 2v6h6M12 18v-4M12 11h.01" />
+          </svg>
+        </div>
+        <div>
+          <div class="mi-t">Documents &amp; Alerts</div>
+          <div class="mi-d">
+            Licenses, IDs, visas &middot; 60/30/15-day expiry alerts &middot; QR verify
+          </div>
+        </div>
+        <span class="chev">&rsaquo;</span>
+      </button>
+      <button class="menu-item" data-act="go" data-v="readiness">
+        <div class="mi-ic" style="background: var(--green-soft); color: var(--green)">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <rect x="3" y="3" width="7" height="7" rx="1" />
+            <rect x="14" y="3" width="7" height="7" rx="1" />
+            <rect x="3" y="14" width="7" height="7" rx="1" />
+            <path d="M14 17.5l2 2 4-4" />
+          </svg>
+        </div>
+        <div>
+          <div class="mi-t">Shift Readiness</div>
+          <div class="mi-d">Readiness heatmap by shift &middot; licenses &amp; documents</div>
         </div>
         <span class="chev">&rsaquo;</span>
       </button>
@@ -433,7 +513,7 @@
         </div>
         <div>
           <div class="mi-t">Upload Center</div>
-          <div class="mi-d">Excel import &mdash; roster, reports</div>
+          <div class="mi-d">Excel import &mdash; roster, reports, staff documents</div>
         </div>
         <span class="chev">&rsaquo;</span>
       </button>
@@ -472,6 +552,89 @@
       </div>
       <div class="chips" id="stfChips"></div>
       <div id="stfList"></div>
+    </main>
+
+    <main id="view-docs" class="view">
+      <button class="back" data-act="go" data-v="more">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M15 18l-6-6 6-6" /></svg
+        >More
+      </button>
+      <div class="sec-h">
+        <h2>Documents &amp; Alerts</h2>
+        <span class="sub" id="docsCount"></span>
+      </div>
+      <div class="kpi-grid" id="docsKpis"></div>
+      <div class="card">
+        <div class="card-h">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+            <path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg
+          >Predictive expiry alerts
+        </div>
+        <div id="docsNotif"></div>
+      </div>
+      <div class="btn-row" style="margin-bottom: 14px">
+        <button class="btn btn-ghost" data-act="alerts-export">Export alerts</button
+        ><button class="btn btn-primary" data-act="scan">Verify medic</button>
+      </div>
+      <div id="docsDigest"></div>
+      <div class="searchbar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="7" />
+          <path d="m21 21-4.3-4.3" /></svg
+        ><input id="docsSearch" placeholder="Search name, staff number, document&hellip;" />
+      </div>
+      <div class="chips" id="docsChips"></div>
+      <div id="docsList"></div>
+    </main>
+
+    <main id="view-readiness" class="view">
+      <button class="back" data-act="go" data-v="more">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M15 18l-6-6 6-6" /></svg
+        >More
+      </button>
+      <div class="sec-h">
+        <h2>Shift Readiness</h2>
+        <span class="sub" id="rdyMonth"></span>
+      </div>
+      <div class="kpi-grid" id="rdyStats" style="grid-template-columns: repeat(3, 1fr)"></div>
+      <div class="card">
+        <div class="card-h">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" />
+            <path d="M3 10h18M8 2v4M16 2v4" /></svg
+          >Readiness heatmap &mdash; Day / Night
+        </div>
+        <div id="rdyHeat"></div>
+        <p class="hint" id="rdyPolicy" style="margin-bottom: 0"></p>
+      </div>
+      <div class="card">
+        <div class="card-h">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 3v18h18" />
+            <path d="M7 16l4-4 3 3 5-7" /></svg
+          >Lowest-readiness shifts
+        </div>
+        <div id="rdyLow"></div>
+      </div>
+      <div class="card">
+        <div class="card-h">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <path d="M14 2v6h6" /></svg
+          >What is blocking readiness
+        </div>
+        <div id="rdyBlock"></div>
+      </div>
     </main>
 
     <main id="view-reports" class="view">
@@ -556,6 +719,7 @@
       <div id="dropRoster" class="drop" data-act="pick" data-kind="roster"></div>
       <div id="dropReport" class="drop" data-act="pick" data-kind="report"></div>
       <div id="dropAch" class="drop" data-act="pick" data-kind="ach"></div>
+      <div id="dropDocs" class="drop" data-act="pick" data-kind="docs"></div>
       <input type="file" id="fileIn" accept=".xlsx,.xls" style="display: none" />
     </main>
 
@@ -621,6 +785,14 @@
           <div class="mi-d">Cannot be undone</div>
         </div>
       </button>
+      <div class="menu-label">Shift readiness policy</div>
+      <div class="card">
+        <p class="hint" style="margin-top: 0">
+          A medic counts as ready for a shift only when every document ticked below is valid on that
+          shift&rsquo;s date. Unticked items are still tracked and alerted.
+        </p>
+        <div id="policyList"></div>
+      </div>
       <div class="menu-label">Future enhancements</div>
       <div class="road">
         <h3>Digital transformation roadmap</h3>

@@ -4,6 +4,8 @@ Modular source that compiles to a single, self-contained HTML file for PWA / Cap
 
 ## Layout
 - `src/util.js`   - pure helpers (escaping, dates, ids)
+- `src/docs.js`   - staff documents logic (definitions, 60/30/15-day alert tiers, shift readiness, QR payload)
+- `src/qr.js`     - dependency-free QR Code encoder (SVG output)
 - `src/app.js`    - application (state, views, Excel I/O, delegated dispatcher)
 - `src/index.html`- HTML shell + CSS, with a `/*BUNDLE*/` slot for the compiled JS
 - `data/roster.json` - roster, imported and bundled at build time

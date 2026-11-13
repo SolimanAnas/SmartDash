@@ -1,5 +1,24 @@
 import ROSTER from '../data/roster.json';
 import { esc, deb, dateOf, dispName, initials, telOf, uid, today, fmtD } from './util.js';
+import { qrSvg } from './qr.js';
+import {
+  DOC_DEFS,
+  DOC_GROUPS,
+  defaultPolicy,
+  isBlocking,
+  localISO,
+  addDays,
+  normDate,
+  expiries,
+  docState,
+  assess,
+  crewReadiness,
+  readinessBand,
+  encodeVerify,
+  decodeVerify,
+  verifyPayloadFrom,
+  sampleDossier,
+} from './docs.js';
 
 /* ===== utilities ===== */
 const $ = (s) => document.querySelector(s);
@@ -55,13 +74,51 @@ const saveRep = () => Store.set('dcas_rep', JSON.stringify(reports));
 const saveAch = () => Store.set('dcas_ach', JSON.stringify(achievements));
 const saveInit = () => Store.set('dcas_init', JSON.stringify(initiatives));
 const saveShiftR = () => Store.set('dcas_shift', JSON.stringify(shiftReports));
-const saveCert = () => Store.set('dcas_cert', JSON.stringify(certifications));
-const certExpiryDays = (d) =>
-  d ? Math.ceil((new Date(d + 'T23:59') - Date.now()) / 86400000) : -Infinity;
-const certStatus = (d) => {
-  const n = certExpiryDays(d);
-  return n < 0 ? 'expired' : n < 90 ? 'soon' : 'valid';
+let notifLog = JSON.parse(Store.get('dcas_notif') || '{}');
+let policy = JSON.parse(Store.get('dcas_policy') || 'null') || defaultPolicy();
+const saveCert = () => {
+  Store.set('dcas_cert', JSON.stringify(certifications));
+  _expCache = null;
 };
+const saveNotif = () => Store.set('dcas_notif', JSON.stringify(notifLog));
+
+/* ===== staff documents: lookups, dates, readiness ===== */
+const nowISO = () => localISO();
+const rosterStart = () =>
+  localISO(new Date(ROSTER.year || 2026, ROSTER.monthIndex == null ? 5 : ROSTER.monthIndex, 1));
+const rosterISO = (d) => addDays(rosterStart(), d - 1);
+const dayLabel = (d) =>
+  new Date(
+    ROSTER.year || 2026,
+    ROSTER.monthIndex == null ? 5 : ROSTER.monthIndex,
+    d,
+  ).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+const findStaff = (id, team) =>
+  STAFF.filter((x) => x.id === id && x.team === team)[0] || STAFF.filter((x) => x.id === id)[0];
+const teamSics = (team) =>
+  STAFF.filter((s) => s.team === team && (s.title === 'SIC' || s.callsign === 'Supervisor'));
+let _expCache = null;
+function expsOf(s) {
+  if (!_expCache) {
+    _expCache = {};
+    certifications.forEach((r) => {
+      const e = expiries(r.certs);
+      _expCache[r.staffTeam + '|' + r.staffId] = e;
+      if (!_expCache['|' + r.staffId]) _expCache['|' + r.staffId] = e;
+    });
+  }
+  return _expCache[s.team + '|' + s.id] || _expCache['|' + s.id] || {};
+}
+const hasRecord = (s) => !!getStaffCerts(s.id, s.team);
+const staffAssess = (s, asOf) => assess(s, expsOf(s), asOf || nowISO(), policy);
+const shiftCrew = (d, code) => STAFF.filter((s) => shiftOn(s, d) === code);
+const shiftReadiness = (d, code) => crewReadiness(shiftCrew(d, code), expsOf, rosterISO(d), policy);
+const tierText = (a) =>
+  a.days < 0
+    ? 'expired ' + fmtD(a.exp)
+    : a.days === 0
+      ? 'expires today'
+      : 'expires ' + fmtD(a.exp) + ' (' + a.days + 'd)';
 
 function seedSample(force) {
   reports = [
@@ -193,44 +250,9 @@ function seedSample(force) {
       createdAt: Date.now(),
     },
   ];
-  certifications = [
-    {
-      staffId: '2238',
-      staffTeam: 'A',
-      certs: {
-        bls: '2027-06-01',
-        acls: '2026-12-15',
-        pals: '2026-09-01',
-        phtls: '2027-03-01',
-        driving: '2027-05-01',
-        airport: '2026-08-15',
-      },
-    },
-    {
-      staffId: '756',
-      staffTeam: 'A',
-      certs: {
-        bls: '2026-07-01',
-        acls: '2026-06-01',
-        pals: '2026-11-01',
-        phtls: '2027-02-01',
-        driving: '2026-12-01',
-        airport: '2026-09-01',
-      },
-    },
-    {
-      staffId: '1293',
-      staffTeam: 'B',
-      certs: {
-        bls: '2026-08-01',
-        acls: '2026-10-01',
-        pals: '2027-04-01',
-        phtls: '2026-07-01',
-        driving: '2027-06-01',
-        airport: '2026-11-01',
-      },
-    },
-  ];
+  certifications = seedDocs();
+  notifLog = {};
+  saveNotif();
   shiftReports = [
     {
       id: uid(),
@@ -282,12 +304,21 @@ function seedSample(force) {
   saveAch();
   saveShiftR();
   Store.set('dcas_seeded', '1');
+  Store.set('dcas_docs_v', '1');
   if (force) {
     go('dashboard');
+    runAlertEngine();
     toast('Sample data loaded');
   }
 }
-if (!Store.get('dcas_seeded')) seedSample(false);
+/* Demo document set for every roster member (anonymised roster → sample records only). */
+function seedDocs() {
+  const now = nowISO(),
+    start = rosterStart();
+  return STAFF.map((s) =>
+    Object.assign({ staffId: s.id, staffTeam: s.team, sample: 1 }, sampleDossier(s, now, start)),
+  );
+}
 
 let toastTimer;
 function toast(m) {
@@ -314,6 +345,8 @@ function go(v) {
     upload: 'more',
     settings: 'more',
     shift: 'more',
+    docs: 'more',
+    readiness: 'more',
   };
   document
     .querySelectorAll('.nav button')
@@ -336,6 +369,8 @@ function go(v) {
     upload: renderUpload,
     settings: renderSettings,
     shift: renderShift,
+    docs: renderDocs,
+    readiness: renderReadiness,
   };
   if (r[v]) r[v]();
 }
@@ -362,6 +397,7 @@ function refreshDay() {
   if (view === 'dashboard') renderDashboard();
   if (view === 'command') renderCommand();
   if (view === 'roster') renderRoster();
+  if (view === 'readiness') renderReadiness();
 }
 
 /* ===== derived ops data ===== */
@@ -488,18 +524,9 @@ function renderDashboard() {
   const openIssues = challenges.filter((c) => c.status !== 'Resolved').length;
   const avail = Math.round((onDuty / STAFF.length) * 100);
 
-  const expiredCerts = [],
-    soonCerts = [];
-  certifications.forEach((record) => {
-    if (!record.certs) return;
-    Object.entries(record.certs).forEach(([_k, d]) => {
-      const s = certStatus(d);
-      if (s === 'expired') expiredCerts.push(record.staffId);
-      else if (s === 'soon') soonCerts.push(record.staffId);
-    });
-  });
-  const uniqueExpired = [...new Set(expiredCerts)].length;
-  const uniqueSoon = [...new Set(soonCerts)].length;
+  const alerts = currentAlerts(nowISO()).filter((a) => a.tier !== 'missing');
+  const uniqueExpired = alerts.filter((a) => a.tier === 'expired').length;
+  const uniqueSoon = alerts.filter((a) => a.tier !== 'expired').length;
 
   const bandItems = [
     { n: onDuty, l: 'On duty', dot: true, cls: 'good' },
@@ -528,15 +555,16 @@ function renderDashboard() {
       .join('') +
     '</div>' +
     (uniqueExpired || uniqueSoon
-      ? '<div class="lb-cert" data-act="go" data-v="staff">' +
+      ? '<div class="lb-cert" data-act="go" data-v="docs">' +
         (uniqueExpired
           ? '<span class="lb-badge lb-bad">' + uniqueExpired + ' expired</span>'
           : '') +
         (uniqueSoon
-          ? '<span class="lb-badge lb-warn">' + uniqueSoon + ' expiring soon</span>'
+          ? '<span class="lb-badge lb-warn">' + uniqueSoon + ' due \u2264 60 days</span>'
           : '') +
-        '<span class="lb-cert-l">Certifications \u2192</span></div>'
+        '<span class="lb-cert-l">Documents \u2192</span></div>'
       : '');
+  renderDashReady(dashShift);
 
   const todayStr = today();
   const h = new Date().getHours();
@@ -649,6 +677,96 @@ function renderDashboard() {
   $('#dashCoverage').innerHTML =
     '<div class="cov-list">' + cov.map((c, i) => covRow(c, i)).join('') + '</div>';
 }
+/* ===== shift readiness (dashboard card) ===== */
+const BAND_TXT = { ok: 'Ready', watch: 'Watch', risk: 'At risk', none: 'No crew' };
+const bandPill = (band) =>
+  '<span class="status-pill ' +
+  { ok: 'sp-ok', watch: 'sp-short', risk: 'sp-crit', none: 'sp-none' }[band] +
+  '"><span class="d"></span>' +
+  BAND_TXT[band] +
+  '</span>';
+function hmCell(d, code, r) {
+  const band = readinessBand(r.pct);
+  return (
+    '<button class="hm-cell b-' +
+    band +
+    '" data-act="ready-shift" data-d="' +
+    d +
+    '" data-c="' +
+    code +
+    '" title="' +
+    esc(
+      dayLabel(d) +
+        ' \u00b7 ' +
+        CODES[code].l +
+        ': ' +
+        (r.pct == null ? 'no crew' : r.pct + '% ready (' + r.ready + '/' + r.crew + ')'),
+    ) +
+    '" aria-label="' +
+    esc(
+      dayLabel(d) +
+        ' ' +
+        CODES[code].l +
+        ' shift, ' +
+        (r.pct == null
+          ? 'no crew'
+          : r.pct + ' percent ready, ' + r.ready + ' of ' + r.crew + ' crew'),
+    ) +
+    '"><span class="hm-s">' +
+    code +
+    '</span><span class="hm-v">' +
+    (r.pct == null ? '\u2014' : r.pct + (band === 'risk' ? '!' : '')) +
+    '</span></button>'
+  );
+}
+function renderDashReady(code) {
+  const r = shiftReadiness(day, code);
+  const band = readinessBand(r.pct);
+  let strip = '';
+  for (let d = day; d < Math.min(30, day + 6) + 1; d++)
+    strip +=
+      '<div class="hm-day' +
+      (d === day ? ' sel' : '') +
+      '"><div class="hm-dn">' +
+      d +
+      '</div>' +
+      hmCell(d, 'D', shiftReadiness(d, 'D')) +
+      hmCell(d, 'N', shiftReadiness(d, 'N')) +
+      '</div>';
+  const blockedDocs = {};
+  r.rows.forEach((x) =>
+    x.a.blockers.forEach((b) => (blockedDocs[b.def.sl] = (blockedDocs[b.def.sl] || 0) + 1)),
+  );
+  const top = Object.entries(blockedDocs).sort((a, b) => b[1] - a[1]);
+  $('#dashReady').innerHTML =
+    '<div class="rd-top" data-act="ready-shift" data-d="' +
+    day +
+    '" data-c="' +
+    code +
+    '"><div class="rd-n">' +
+    (r.pct == null ? '\u2014' : r.pct + '<span class="kpi-unit">%</span>') +
+    '</div><div class="rd-meta"><div class="rd-t">' +
+    CODES[code].l +
+    ' shift \u00b7 ' +
+    esc(dayLabel(day)) +
+    ' ' +
+    bandPill(band) +
+    '</div><div class="rd-s">' +
+    r.ready +
+    '/' +
+    r.crew +
+    ' crew with valid licenses & documents' +
+    (top.length
+      ? ' \u00b7 blocked by ' +
+        top
+          .slice(0, 3)
+          .map((t) => esc(t[0]) + ' (' + t[1] + ')')
+          .join(', ')
+      : '') +
+    '</div></div></div><div class="hm-strip">' +
+    strip +
+    '</div>';
+}
 function covRow(c, i) {
   const pct = c.stations ? Math.round((c.covered / c.stations) * 100) : 0;
   const sp =
@@ -751,6 +869,7 @@ function renderCommand() {
       );
     })
     .join('');
+  $('#cmdReady').innerHTML = shiftReadyHtml(day, cmdShift);
   const sm = singleMedicUnits(day);
   const smCard = $('#singleMedicCard');
   smCard.style.display = sm.length ? '' : 'none';
@@ -910,22 +1029,22 @@ function renderRoster() {
           const bg = isSup ? 'var(--red-soft)' : 'var(--night-soft)';
           return (
             '<div class="staff-row" style="padding:8px 0;border-top:1px solid var(--line)" data-act="staff" data-id="' +
-              esc(s.id) +
-              '" data-team="' +
-              esc(s.team) +
-              '"><span class="callsign" style="font-size:11px;padding:4px 7px;background:' +
-              bg +
-              '">' +
-              esc(s.callsign) +
-              '</span><div class="info"><div class="nm" style="font-size:13.5px">' +
-              esc(dispName(s.name)) +
-              '</div><div class="sub">' +
-              esc(s.area || s.airport) +
-              ' \u00b7 Team ' +
-              s.team +
-              (s.adp ? ' \u00b7 <span style="color:var(--green);font-weight:600">ADP</span>' : '') +
-              (s.tdp ? ' \u00b7 <span style="color:var(--blue);font-weight:600">TDP</span>' : '') +
-              '</div></div><span class="scode sc-' +
+            esc(s.id) +
+            '" data-team="' +
+            esc(s.team) +
+            '"><span class="callsign" style="font-size:11px;padding:4px 7px;background:' +
+            bg +
+            '">' +
+            esc(s.callsign) +
+            '</span><div class="info"><div class="nm" style="font-size:13.5px">' +
+            esc(dispName(s.name)) +
+            '</div><div class="sub">' +
+            esc(s.area || s.airport) +
+            ' \u00b7 Team ' +
+            s.team +
+            (s.adp ? ' \u00b7 <span style="color:var(--green);font-weight:600">ADP</span>' : '') +
+            (s.tdp ? ' \u00b7 <span style="color:var(--blue);font-weight:600">TDP</span>' : '') +
+            '</div></div><span class="scode sc-' +
             shiftOn(s, day) +
             '">' +
             CODES[shiftOn(s, day)].l +
@@ -1009,33 +1128,6 @@ function renderStaff() {
 const getStaffCerts = (id, team) =>
   certifications.filter((c) => c.staffId === id && c.staffTeam === team)[0] ||
   certifications.filter((c) => c.staffId === id)[0];
-const certBadge = (label, key, data) => {
-  const d = data ? data[key] : null;
-  const s = d ? certStatus(d) : null;
-  const days = d ? certExpiryDays(d) : 0;
-  const color =
-    s === 'expired'
-      ? ['var(--red-soft)', 'var(--red-d)']
-      : s === 'soon'
-        ? ['var(--amber-soft)', 'var(--amber)']
-        : ['var(--green-soft)', 'var(--green)'];
-  return (
-    '<span style="display:inline-flex;align-items:center;gap:6px;background:' +
-    color[0] +
-    ';color:' +
-    color[1] +
-    ';padding:4px 9px;border-radius:8px;font-size:12px;font-weight:600;margin:3px 3px 0 0">' +
-    esc(label) +
-    ' ' +
-    (d ? fmtD(d) : '<span style="opacity:.5">—</span>') +
-    (s === 'expired'
-      ? ' <span style="font-size:10px">EXPIRED</span>'
-      : s === 'soon'
-        ? ' <span style="font-size:10px">(' + days + 'd)</span>'
-        : '') +
-    '</span>'
-  );
-};
 function viewStaff(id, team) {
   const s =
     STAFF.filter((x) => x.id === id && x.team === team)[0] || STAFF.filter((x) => x.id === id)[0];
@@ -1052,6 +1144,7 @@ function viewStaff(id, team) {
       (i.ownerId && i.ownerId === s.id) ||
       dispName(i.owner || '').toLowerCase() === dispName(s.name).toLowerCase(),
   );
+  const docs = docsSection(s);
   openSheet(
     dispName(s.name),
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px"><span class="tag ' +
@@ -1066,6 +1159,7 @@ function viewStaff(id, team) {
       (s.adp ? '<span class="tag">ADP</span>' : '') +
       (s.tdp ? '<span class="tag">TDP</span>' : '') +
       '</div>' +
+      docs.banner +
       det(
         'Station',
         '<span class="mono" style="color:var(--red-d);font-weight:600">' +
@@ -1086,6 +1180,7 @@ function viewStaff(id, team) {
           esc(s.phone) +
           '</a>',
       ) +
+      docs.body +
       det(
         'Attendance \u2014 June',
         '<span style="color:var(--day);font-weight:600">' +
@@ -1130,7 +1225,6 @@ function viewStaff(id, team) {
               .join('')
           : '<span style="color:var(--muted)">None</span>',
       ) +
-      det('Certifications', certSection(s)) +
       det('Shift schedule \u2014 June 2026', miniCal(s)),
   );
 }
@@ -1151,91 +1245,525 @@ function miniCal(s) {
   return h + '</div>';
 }
 
-function certSection(s) {
-  const data = getStaffCerts(s.id, s.team);
-  const keys = {
-    bls: 'BLS',
-    acls: 'ACLS',
-    pals: 'PALS',
-    phtls: 'PHTLS',
-    driving: 'Driving Permit',
-    airport: 'Airport Permit',
-  };
-  const certs = data && data.certs ? data.certs : {};
-  const h = Object.entries(keys)
-    .map(([k, label]) => certBadge(label, k, certs))
-    .join('');
+/* ===== staff documents: profile, editor, QR profile, verification ===== */
+const DB_CLS = { expired: 'db-exp', 15: 'db-t15', 30: 'db-t30', 60: 'db-t60' };
+function docBadge(st) {
+  const d = st.def;
+  let cls = 'db-ok',
+    txt;
+  if (st.state === 'na') ((cls = 'db-na'), (txt = 'N/A'));
+  else if (st.state === 'none') ((cls = 'db-na'), (txt = 'not held'));
+  else if (st.state === 'missing') ((cls = 'db-miss'), (txt = 'missing'));
+  else {
+    cls = DB_CLS[st.tier] || 'db-ok';
+    txt =
+      (d.months ? 'due ' : '') +
+      fmtD(st.exp) +
+      (st.state === 'expired' ? ' · EXPIRED' : st.tier ? ' · ' + st.days + 'd' : '');
+  }
   return (
-    '<div style="margin-bottom:8px">' +
-    h +
-    '</div>' +
-    '<button class="btn btn-ghost" data-act="stf-cert" data-id="' +
-    esc(s.id) +
-    '" data-team="' +
-    esc(s.team) +
-    '">Update certifications</button>'
+    '<span class="dbadge ' +
+    cls +
+    '">' +
+    (st.blocking ? '<i class="db-req" title="Required for duty"></i>' : '') +
+    esc(d.l) +
+    ' <b>' +
+    txt +
+    '</b></span>'
   );
 }
-function editStfCerts(id, team) {
-  const s =
-    STAFF.filter((x) => x.id === id && x.team === team)[0] || STAFF.filter((x) => x.id === id)[0];
-  if (!s) return;
-  let data = getStaffCerts(id, team);
-  if (!data) {
-    data = { staffId: id, staffTeam: team, certs: {} };
-    certifications.push(data);
-  }
-  const keys = {
-    bls: 'BLS',
-    acls: 'ACLS',
-    pals: 'PALS',
-    phtls: 'PHTLS',
-    driving: 'Driving Permit',
-    airport: 'Airport Permit',
+const blockerText = (b) =>
+  esc(b.def.l) + ' ' + (b.state === 'missing' ? 'not on file' : 'expired ' + fmtD(b.exp));
+function readyBanner(a) {
+  return a.ready
+    ? '<div class="rbanner rb-ok"><b>Ready for duty</b><span>' +
+        (a.watch.length
+          ? a.watch.length + ' item(s) need attention soon'
+          : 'All required licenses & documents valid') +
+        '</span></div>'
+    : '<div class="rbanner rb-bad"><b>Not ready for duty</b><span>' +
+        a.blockers.map(blockerText).join(' · ') +
+        '</span></div>';
+}
+function qualsHtml(list) {
+  return list && list.length
+    ? list
+        .map(
+          (q) =>
+            '<div class="ql"><b>' +
+            esc(q.title) +
+            '</b>' +
+            (q.inst ? ' · ' + esc(q.inst) : '') +
+            (q.year ? ' · ' + esc(q.year) : '') +
+            (q.attested
+              ? ' <span class="tag tag-ok">Attested</span>'
+              : ' <span class="tag tag-warn">Attestation pending</span>') +
+            '</div>',
+        )
+        .join('')
+    : '<span style="color:var(--muted)">None recorded</span>';
+}
+function trainingHtml(list) {
+  if (!list || !list.length) return '<span style="color:var(--muted)">None recorded</span>';
+  const hrs = list.reduce((n, t) => n + (+t.hours || 0), 0);
+  return (
+    '<div class="tl-list">' +
+    list
+      .slice()
+      .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+      .map(
+        (t) =>
+          '<div class="tl"><span class="tl-d mono">' +
+          fmtD(t.date) +
+          '</span><div><b>' +
+          esc(t.course) +
+          '</b><div class="tl-m">' +
+          esc([t.provider, t.hours ? t.hours + ' h' : ''].filter(Boolean).join(' · ')) +
+          '</div></div></div>',
+      )
+      .join('') +
+    '</div>' +
+    (hrs ? '<div class="tl-tot">' + hrs + ' training hours on record</div>' : '')
+  );
+}
+function docsSection(s) {
+  const a = staffAssess(s);
+  const rec = getStaffCerts(s.id, s.team) || {};
+  return {
+    banner: readyBanner(a),
+    body:
+      DOC_GROUPS.map((g) =>
+        det(
+          g.t,
+          '<div class="dbadges">' +
+            a.items
+              .filter((i) => i.def.g === g.k)
+              .map(docBadge)
+              .join('') +
+            '</div>',
+        ),
+      ).join('') +
+      det('Academic qualifications', qualsHtml(rec.quals)) +
+      det('Training path', trainingHtml(rec.training)) +
+      '<div class="btn-row" style="margin:12px 0 4px"><button class="btn btn-ghost" data-act="stf-cert" data-id="' +
+      esc(s.id) +
+      '" data-team="' +
+      esc(s.team) +
+      '">Update documents</button><button class="btn btn-primary" data-act="stf-qr" data-id="' +
+      esc(s.id) +
+      '" data-team="' +
+      esc(s.team) +
+      '">QR profile</button></div>',
   };
-  const c = data.certs || {};
-  const fields = Object.entries(keys)
-    .map(
-      ([k, label]) =>
-        '<div class="field" style="flex:1;min-width:120px"><label>' +
-        label +
-        '</label><input id="cert-' +
-        k +
-        '" type="date" value="' +
-        esc(c[k] || '') +
-        '"></div>',
-    )
-    .join('');
+}
+const qualRow = (q) =>
+  '<div class="erow qual-row"><input class="q-title" placeholder="Qualification" value="' +
+  esc(q.title || '') +
+  '"><input class="q-inst" placeholder="Institution" value="' +
+  esc(q.inst || '') +
+  '"><input class="q-year" inputmode="numeric" placeholder="Year" value="' +
+  esc(q.year || '') +
+  '"><label class="shift-flag"><input type="checkbox" class="q-att"' +
+  (q.attested ? ' checked' : '') +
+  '>Attested</label><button class="iconbtn erow-del" data-act="row-del" aria-label="Remove">×</button></div>';
+const trainRow = (t) =>
+  '<div class="erow train-row"><input class="t-course" placeholder="Course" value="' +
+  esc(t.course || '') +
+  '"><input class="t-prov" placeholder="Provider" value="' +
+  esc(t.provider || '') +
+  '"><input class="t-date" type="date" value="' +
+  esc(t.date || '') +
+  '"><input class="t-hours" type="number" min="0" placeholder="Hours" value="' +
+  esc(t.hours || '') +
+  '"><button class="iconbtn erow-del" data-act="row-del" aria-label="Remove">×</button></div>';
+function editStfCerts(id, team) {
+  const s = findStaff(id, team);
+  if (!s) return;
+  const rec = getStaffCerts(id, team) || {};
+  const c = rec.certs || {};
+  const groups = DOC_GROUPS.map(
+    (g) =>
+      '<div class="doc-gh">' +
+      g.t +
+      '</div><div class="doc-grid">' +
+      DOC_DEFS.filter((d) => d.g === g.k)
+        .map(
+          (d) =>
+            '<div class="field doc-f"><label>' +
+            esc(d.l) +
+            (isBlocking(d, s, policy)
+              ? ' <span class="req" title="Required for duty">*</span>'
+              : '') +
+            ' <span class="doc-fs">' +
+            (d.months ? 'completed on · valid ' + d.months + ' mo' : 'expiry date') +
+            '</span></label><input id="cert-' +
+            d.k +
+            '" type="date" value="' +
+            esc(c[d.k] && c[d.k] !== 'na' ? c[d.k] : '') +
+            '">' +
+            (d.na
+              ? '<label class="shift-flag"><input type="checkbox" id="cert-' +
+                d.k +
+                '-na"' +
+                (c[d.k] === 'na' ? ' checked' : '') +
+                '>Not applicable (UAE national)</label>'
+              : '') +
+            '</div>',
+        )
+        .join('') +
+      '</div>',
+  ).join('');
   openSheet(
-    'Certifications \u2014 ' + dispName(s.name),
-    '<div class="field-row" style="flex-wrap:wrap">' +
-      fields +
-      '</div>' +
-      '<p style="font-size:12px;color:var(--muted);margin:6px 0 14px">Leave blank for certifications the staff member does not hold.</p>' +
-      '<button class="btn btn-primary" data-act="stf-cert-save" data-id="' +
+    'Certifications & documents — ' + dispName(s.name),
+    groups +
+      '<p class="hint"><span class="req">*</span> required for shift readiness. Leave blank for optional certifications not held.</p>' +
+      '<div class="doc-gh">Academic qualifications</div><div id="qualRows">' +
+      (rec.quals || []).map(qualRow).join('') +
+      '</div><button class="btn btn-ghost btn-sm" data-act="qual-add">+ Add qualification</button>' +
+      '<div class="doc-gh">Training path</div><div id="trainRows">' +
+      (rec.training || []).map(trainRow).join('') +
+      '</div><button class="btn btn-ghost btn-sm" data-act="train-add">+ Add training</button>' +
+      '<button class="btn btn-primary" style="margin-top:16px" data-act="stf-cert-save" data-id="' +
       esc(id) +
       '" data-team="' +
       esc(team) +
-      '">Save certifications</button>',
+      '">Save documents</button>',
   );
 }
 function saveStfCerts(id, team) {
-  const keys = ['bls', 'acls', 'pals', 'phtls', 'driving', 'airport'];
   const certs = {};
-  keys.forEach((k) => {
-    const v = $('#cert-' + k).value;
-    if (v) certs[k] = v;
+  DOC_DEFS.forEach((d) => {
+    const na = $('#cert-' + d.k + '-na');
+    if (na && na.checked) certs[d.k] = 'na';
+    else if ($('#cert-' + d.k).value) certs[d.k] = $('#cert-' + d.k).value;
   });
-  let data = getStaffCerts(id, team);
-  if (data) data.certs = certs;
-  else {
-    certifications.push({ staffId: id, staffTeam: team, certs: certs });
+  const val = (r, c) => r.querySelector(c).value.trim();
+  const quals = Array.from(document.querySelectorAll('#qualRows .qual-row'))
+    .map((r) => ({
+      title: val(r, '.q-title'),
+      inst: val(r, '.q-inst'),
+      year: val(r, '.q-year'),
+      attested: r.querySelector('.q-att').checked,
+    }))
+    .filter((q) => q.title);
+  const training = Array.from(document.querySelectorAll('#trainRows .train-row'))
+    .map((r) => ({
+      course: val(r, '.t-course'),
+      provider: val(r, '.t-prov'),
+      date: val(r, '.t-date'),
+      hours: +val(r, '.t-hours') || 0,
+    }))
+    .filter((t) => t.course);
+  let rec = getStaffCerts(id, team);
+  if (!rec) {
+    rec = { staffId: id, staffTeam: team };
+    certifications.push(rec);
   }
+  Object.assign(rec, { certs, quals, training, updatedAt: Date.now() });
+  delete rec.sample;
   saveCert();
+  runAlertEngine();
   closeSheet();
   viewStaff(id, team);
-  toast('Certifications saved');
+  toast('Documents saved');
 }
+
+/* --- Paramedic QR Code Profile --- */
+const verifyBase = () =>
+  /^https?:$/.test(location.protocol) ? location.origin + location.pathname : 'smartdash:';
+const verifyUrl = (s) =>
+  verifyBase() +
+  '#verify=' +
+  encodeVerify({
+    id: s.id,
+    team: s.team,
+    title: s.title,
+    name: dispName(s.name),
+    asOf: nowISO(),
+    exps: expsOf(s),
+  });
+const VF = {
+  valid: ['vf-ok', '✓'],
+  watch: ['vf-warn', '!'],
+  expired: ['vf-bad', '✕'],
+  missing: ['vf-bad', '?'],
+  na: ['vf-na', '–'],
+};
+function vfRow(i) {
+  const k =
+    i.state === 'valid'
+      ? i.tier
+        ? 'watch'
+        : 'valid'
+      : i.state === 'missing' && !i.blocking
+        ? 'watch'
+        : i.state;
+  const v =
+    i.state === 'na'
+      ? 'N/A'
+      : i.state === 'missing'
+        ? 'not on file'
+        : i.state === 'expired'
+          ? (i.def.months ? 'overdue since ' : 'expired ') + fmtD(i.exp)
+          : (i.def.months ? 'due ' : 'valid to ') +
+            fmtD(i.exp) +
+            (i.tier ? ' · ' + i.days + 'd' : '');
+  return (
+    '<div class="vf-row"><span class="vf-ic ' +
+    VF[k][0] +
+    '">' +
+    VF[k][1] +
+    '</span><span class="vf-l">' +
+    esc(i.def.l) +
+    (i.blocking ? ' <span class="vf-req">required</span>' : '') +
+    '</span><span class="vf-v">' +
+    v +
+    '</span></div>'
+  );
+}
+function verifyCardBody(a) {
+  return (
+    '<div class="vf-status ' +
+    (a.ready ? 'ok' : 'bad') +
+    '"><b>' +
+    (a.ready ? '✓ READY FOR DUTY' : '✕ NOT READY FOR DUTY') +
+    '</b><span>' +
+    (a.ready
+      ? a.watch.length
+        ? a.watch.length + ' item(s) lapse within 15 days'
+        : 'All required licenses & documents valid'
+      : a.blockers.map(blockerText).join(' · ')) +
+    '</span><span class="vf-asof">Checked ' +
+    fmtD(nowISO()) +
+    '</span></div>' +
+    DOC_GROUPS.map((g) => {
+      const items = a.items.filter((i) => i.def.g === g.k && i.state !== 'none');
+      return items.length
+        ? '<div class="vf-g"><div class="vf-gh">' +
+            (g.k === 'refresher' ? 'Required refresher courses' : g.t) +
+            '</div>' +
+            items.map(vfRow).join('') +
+            '</div>'
+        : '';
+    }).join('')
+  );
+}
+function vfHeader(s) {
+  return (
+    '<div class="staff-row vf-head"><div class="avatar">' +
+    esc(initials(s.name)) +
+    '</div><div class="info"><div class="nm">' +
+    esc(dispName(s.name)) +
+    '</div><div class="sub"><span class="mono">#' +
+    esc(s.id) +
+    '</span> · Team ' +
+    esc(s.team) +
+    ' · ' +
+    esc(s.title) +
+    (s.callsign ? ' · <span class="mono">' + esc(s.callsign) + '</span>' : '') +
+    '</div></div></div>'
+  );
+}
+function viewQr(id, team) {
+  const s = findStaff(id, team);
+  if (!s) return;
+  openSheet(
+    'QR profile — ' + dispName(s.name),
+    '<div class="qr-wrap"><div class="qr-box">' +
+      qrSvg(verifyUrl(s)) +
+      '</div><div class="qr-cap"><b>' +
+      esc(dispName(s.name)) +
+      '</b><span class="mono">#' +
+      esc(s.id) +
+      ' · Team ' +
+      esc(s.team) +
+      ' · ' +
+      esc(s.title) +
+      '</span><span>Issued ' +
+      fmtD(nowISO()) +
+      '</span></div></div>' +
+      verifyCardBody(staffAssess(s)) +
+      '<div class="btn-row" style="margin-top:14px"><button class="btn btn-ghost" data-act="qr-png" data-id="' +
+      esc(s.id) +
+      '" data-team="' +
+      esc(s.team) +
+      '">Download badge</button><button class="btn btn-primary" data-act="qr-link" data-id="' +
+      esc(s.id) +
+      '" data-team="' +
+      esc(s.team) +
+      '">Copy link</button></div>' +
+      '<p class="hint">Supervisors scan this code with any phone camera (or <b>Verify medic</b> in Documents &amp; Alerts) to check readiness, accreditations and refresher courses instantly. Status data travels in the link’s #fragment, which is never sent to a server. A device holding SmartDash records always shows the live record; re-issue the badge after renewals.</p>',
+  );
+}
+function downloadQrPng(id, team) {
+  const s = findStaff(id, team);
+  if (!s) return;
+  const img = new Image();
+  img.onload = () => {
+    const W = 720,
+      c = document.createElement('canvas');
+    c.width = W;
+    c.height = W + 128;
+    const g = c.getContext('2d');
+    g.fillStyle = '#fff';
+    g.fillRect(0, 0, c.width, c.height);
+    g.imageSmoothingEnabled = false;
+    g.drawImage(img, 0, 0, W, W);
+    g.textAlign = 'center';
+    g.fillStyle = '#15202b';
+    g.font = '700 34px Sora, sans-serif';
+    g.fillText(dispName(s.name), W / 2, W + 38);
+    g.fillStyle = '#4a5563';
+    g.font = '600 24px "IBM Plex Mono", monospace';
+    g.fillText('#' + s.id + ' · Team ' + s.team + ' · ' + s.title, W / 2, W + 76);
+    g.font = '500 20px "IBM Plex Sans", sans-serif';
+    g.fillText('SmartDash paramedic profile · issued ' + fmtD(nowISO()), W / 2, W + 108);
+    c.toBlob((b) => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(b);
+      a.download = 'smartdash-qr-' + s.id + '.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    });
+  };
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(qrSvg(verifyUrl(s)));
+}
+function copyQrLink(id, team) {
+  const s = findStaff(id, team);
+  if (!s) return;
+  const url = verifyUrl(s);
+  if (navigator.clipboard && navigator.clipboard.writeText)
+    navigator.clipboard.writeText(url).then(
+      () => toast('Verification link copied'),
+      () => toast('Copy not available on this device'),
+    );
+  else toast('Copy not available on this device');
+}
+/* Verification card: from a scanned badge (snapshot) or a live lookup. */
+function showVerify(p, manual) {
+  const s = findStaff(p.id, p.team);
+  const live = !!s && hasRecord(s);
+  const subject = s || { id: p.id, team: p.team, title: p.title, name: p.name };
+  const exps = live ? expsOf(s) : p.exps;
+  let diffs = 0;
+  if (live && !manual)
+    DOC_DEFS.forEach((d) => {
+      if ((p.exps[d.k] || '') !== (exps[d.k] || '')) diffs++;
+    });
+  const src = manual
+    ? '<div class="vf-src ok">Live record on this device</div>'
+    : live
+      ? '<div class="vf-src ' +
+        (diffs ? 'warn' : 'ok') +
+        '">Live record on this device · ' +
+        (diffs
+          ? 'badge issued ' +
+            fmtD(p.asOf) +
+            ' is out of date (' +
+            diffs +
+            ' change' +
+            (diffs > 1 ? 's' : '') +
+            ') — re-issue it'
+          : 'matches badge issued ' + fmtD(p.asOf)) +
+        '</div>'
+      : '<div class="vf-src warn">Badge snapshot issued ' +
+        fmtD(p.asOf) +
+        ' · no live record on this device to confirm against</div>';
+  openSheet(
+    'Verify medic',
+    vfHeader(subject) +
+      src +
+      verifyCardBody(assess(subject, exps, nowISO(), policy)) +
+      (s
+        ? '<button class="btn btn-ghost" style="margin-top:12px" data-act="staff" data-id="' +
+          esc(s.id) +
+          '" data-team="' +
+          esc(s.team) +
+          '">Open full profile</button>'
+        : ''),
+  );
+}
+const canScan = () =>
+  'BarcodeDetector' in window && !!navigator.mediaDevices && !!navigator.mediaDevices.getUserMedia;
+function openScanner() {
+  const can = canScan();
+  openSheet(
+    'Verify medic',
+    (can
+      ? '<div class="scan-box"><video id="scanVid" playsinline muted></video><div class="scan-frame"></div></div><p class="hint" id="scanMsg">Point the camera at a SmartDash QR badge…</p>'
+      : '<p class="hint">In-app scanning isn’t supported in this browser — scan the badge with the phone’s camera app, or look the medic up by staff ID.</p>') +
+      '<div class="field"><label>Staff ID</label><input id="verifyId" inputmode="numeric" placeholder="e.g. 0002"></div><button class="btn btn-primary" data-act="verify-id">Verify</button>',
+  );
+  if (can) startScan();
+}
+async function startScan() {
+  let stream = null,
+    timer = 0,
+    stopped = false;
+  const stop = () => {
+    stopped = true;
+    clearTimeout(timer);
+    if (stream) stream.getTracks().forEach((t) => t.stop());
+  };
+  sheetCleanup = stop;
+  const msg = (t) => {
+    const m = $('#scanMsg');
+    if (m) m.textContent = t;
+  };
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    if (stopped) return stop();
+    const v = $('#scanVid');
+    v.srcObject = stream;
+    await v.play();
+    const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+    const tick = async () => {
+      if (stopped) return;
+      try {
+        const codes = await detector.detect(v);
+        const hit = codes.filter((c) => c.rawValue.indexOf('verify=') >= 0)[0];
+        if (hit) {
+          stop();
+          sheetCleanup = null;
+          const p = decodeVerify(verifyPayloadFrom(hit.rawValue));
+          return p ? showVerify(p) : msg('Unreadable SmartDash badge');
+        }
+        if (codes.length) msg('That QR code is not a SmartDash badge');
+      } catch (e) {}
+      timer = setTimeout(tick, 250);
+    };
+    tick();
+  } catch (e) {
+    msg('Camera unavailable — enter the staff ID instead.');
+  }
+}
+function verifyById() {
+  const v = ($('#verifyId').value || '').trim().replace(/^#/, '');
+  const n = v.replace(/^0+/, '');
+  const s = STAFF.filter((x) => x.id === v || (n && x.id.replace(/^0+/, '') === n))[0];
+  if (!s) {
+    toast('No staff with ID ' + v);
+    return;
+  }
+  showVerify({ id: s.id, team: s.team, exps: {}, asOf: nowISO() }, true);
+}
+function handleHash() {
+  const h = location.hash || '';
+  if (!h) return;
+  const clear = () => history.replaceState(null, '', location.pathname + location.search);
+  if (h.indexOf('#verify=') === 0) {
+    const p = decodeVerify(verifyPayloadFrom(h));
+    clear();
+    if (p) showVerify(p);
+    else toast('This QR code could not be read');
+  } else if (h === '#docs' || h === '#readiness') {
+    clear();
+    go(h.slice(1));
+  }
+}
+
 /* ===== challenges ===== */
 const PRIOS = ['Low', 'Medium', 'High', 'Critical'],
   CH_STATUS = ['Open', 'In progress', 'Resolved'],
@@ -2444,10 +2972,600 @@ function delInit(id) {
   toast('Deleted');
 }
 
+/* ===== predictive expiry alerts (60 / 30 / 15 days, and on expiry) ===== */
+let docsFilter = 'active';
+const TIER_LBL = {
+  expired: 'Expired',
+  15: '15 days',
+  30: '30 days',
+  60: '60 days',
+  missing: 'Not on file',
+};
+const TIER_ORD = { expired: 0, 15: 1, 30: 2, 60: 3, missing: 4 };
+/* One entry per document that has reached a milestone (or is missing) as of `asOf`. */
+function currentAlerts(asOf) {
+  const out = [];
+  STAFF.forEach((s) => {
+    const exps = expsOf(s);
+    DOC_DEFS.forEach((def) => {
+      const st = docState(def, exps[def.k], asOf);
+      if (!st.tier && st.state !== 'missing') return;
+      const base = s.team + '|' + s.id + '|' + def.k + '|' + st.exp;
+      out.push({
+        s,
+        def,
+        exp: st.exp,
+        days: st.days,
+        tier: st.state === 'missing' ? 'missing' : st.tier,
+        base,
+        key: base + '|' + st.tier,
+        blocking: isBlocking(def, s, policy),
+      });
+    });
+  });
+  return out.sort(
+    (a, b) =>
+      TIER_ORD[a.tier] - TIER_ORD[b.tier] || a.days - b.days || a.def.l.localeCompare(b.def.l),
+  );
+}
+/*
+ * The alert engine: every milestone a document crosses is raised once (logged with a
+ * timestamp, addressed to the medic and their team's SIC) and pushed as a device
+ * notification when permitted. Renewing a document retires its alerts automatically.
+ */
+function runAlertEngine(manual) {
+  const list = currentAlerts(nowISO()).filter((a) => a.tier !== 'missing');
+  const live = {};
+  list.forEach((a) => (live[a.base] = 1));
+  Object.keys(notifLog).forEach((k) => {
+    if (!live[k.split('|').slice(0, 4).join('|')]) delete notifLog[k];
+  });
+  const t = Date.now();
+  const fresh = list.filter((a) => !notifLog[a.key]);
+  fresh.forEach((a) => (notifLog[a.key] = { at: t }));
+  saveNotif();
+  Store.set('dcas_notif_run', String(t));
+  if (fresh.length) deviceNotify(fresh);
+  if (manual)
+    toast(fresh.length ? fresh.length + ' new alert(s) raised' : 'Checked — no new milestones');
+  if (view === 'docs') renderDocs();
+  return fresh;
+}
+const notifSupported = () => typeof Notification !== 'undefined';
+function showDeviceNotification(title, body) {
+  const opts = {
+    body,
+    tag: 'smartdash-expiry',
+    icon: 'icons/icon-192x192.png',
+    badge: 'icons/icon-96x96.png',
+    data: { url: './#docs' },
+  };
+  const fallback = () => {
+    try {
+      new Notification(title, opts);
+    } catch (e) {}
+  };
+  if (navigator.serviceWorker && navigator.serviceWorker.getRegistration)
+    navigator.serviceWorker
+      .getRegistration()
+      .then((reg) => (reg ? reg.showNotification(title, opts) : fallback()))
+      .catch(fallback);
+  else fallback();
+}
+function deviceNotify(fresh) {
+  if (!notifSupported() || Notification.permission !== 'granted') return;
+  const body =
+    fresh
+      .slice(0, 4)
+      .map((a) => dispName(a.s.name) + ' — ' + a.def.l + ' ' + tierText(a))
+      .join('\n') + (fresh.length > 4 ? '\n+' + (fresh.length - 4) + ' more' : '');
+  showDeviceNotification(
+    fresh.length === 1 ? 'Document expiry alert' : fresh.length + ' document expiry alerts',
+    body,
+  );
+}
+function enableNotifications() {
+  if (!notifSupported()) {
+    toast('Notifications are not supported on this device');
+    return;
+  }
+  Promise.resolve(Notification.requestPermission()).then((p) => {
+    if (p === 'granted') {
+      const n = currentAlerts(nowISO()).filter((a) => a.tier !== 'missing').length;
+      showDeviceNotification(
+        'SmartDash alerts are on',
+        n
+          ? n + ' active expiry alert(s). You will be notified at 60, 30 and 15 days before expiry.'
+          : 'You will be notified at 60, 30 and 15 days before any document expires.',
+      );
+      toast('Device notifications enabled');
+    } else toast('Notifications were not allowed');
+    renderDocs();
+  });
+}
+const smsHref = (phones, body) =>
+  'sms:' +
+  phones
+    .map((p) => String(p || '').replace(/[^\d+]/g, ''))
+    .filter(Boolean)
+    .join(',') +
+  '?body=' +
+  encodeURIComponent(body);
+const medicMsg = (a) =>
+  'SmartDash reminder: your ' +
+  a.def.l +
+  (a.tier === 'missing'
+    ? ' is not on file. Please submit a copy to your supervisor.'
+    : (a.days < 0
+        ? ' expired on ' + fmtD(a.exp)
+        : ' expires on ' + fmtD(a.exp) + ' (' + a.days + ' days)') +
+      '. Please renew it to avoid any interruption to your operational privileges.');
+const sicMsg = (a) =>
+  'SmartDash alert — ' +
+  dispName(a.s.name) +
+  ' (#' +
+  a.s.id +
+  ', Team ' +
+  a.s.team +
+  '): ' +
+  a.def.l +
+  ' ' +
+  (a.tier === 'missing' ? 'not on file' : tierText(a)) +
+  '.';
+function sendNotice(a) {
+  if (a.key && a.key.indexOf('miss') !== 0) {
+    const e = notifLog[a.key] || (notifLog[a.key] = { at: Date.now() });
+    e[a.role] = Date.now();
+    saveNotif();
+    renderDocs();
+  }
+  window.location.href = a.href;
+}
+function sendDigest(team) {
+  const list = currentAlerts(nowISO()).filter((a) => a.s.team === team);
+  if (!list.length) return;
+  const body =
+    'SmartDash — Team ' +
+    team +
+    ' document alerts (' +
+    fmtD(nowISO()) +
+    '):\n' +
+    list
+      .slice(0, 20)
+      .map(
+        (a) =>
+          '• ' +
+          dispName(a.s.name) +
+          ': ' +
+          a.def.l +
+          ' — ' +
+          (a.tier === 'missing' ? 'not on file' : tierText(a)),
+      )
+      .join('\n') +
+    (list.length > 20 ? '\n+' + (list.length - 20) + ' more in SmartDash' : '');
+  const t = Date.now();
+  list.forEach((a) => {
+    if (notifLog[a.key]) notifLog[a.key].sic = t;
+  });
+  saveNotif();
+  renderDocs();
+  window.location.href = smsHref(
+    teamSics(team).map((x) => x.phone),
+    body,
+  );
+}
+const dShort = (t) => fmtD(localISO(new Date(t))).slice(0, 5);
+function alertRow(a, i) {
+  const n = notifLog[a.key] || {};
+  const sics = teamSics(a.s.team);
+  const raised = Object.keys(notifLog)
+    .filter((k) => k.indexOf(a.base + '|') === 0)
+    .map((k) => ({ t: k.split('|')[4], at: notifLog[k].at }))
+    .sort((x, y) => x.at - y.at);
+  const key = a.tier === 'missing' ? 'miss|' + a.base : a.key;
+  const btn = (role, label, done, href) =>
+    '<button class="btn-mini' +
+    (done ? ' done' : '') +
+    '" data-act="notify" data-role="' +
+    role +
+    '" data-key="' +
+    esc(key) +
+    '" data-href="' +
+    esc(href) +
+    '">' +
+    (done ? '✓ ' + label + ' ' + dShort(done) : label) +
+    '</button>';
+  return (
+    '<div class="rec al-row" style="animation-delay:' +
+    Math.min(i, 12) * 0.02 +
+    's" data-act="docs-staff" data-id="' +
+    esc(a.s.id) +
+    '" data-team="' +
+    esc(a.s.team) +
+    '"><div class="crewline" style="margin:0 0 8px"><span class="al-tier t-' +
+    a.tier +
+    '">' +
+    TIER_LBL[a.tier] +
+    '</span>' +
+    (a.blocking ? '<span class="tag tag-bad">Affects readiness</span>' : '') +
+    '<span class="tag" style="background:transparent;color:var(--muted)">Team ' +
+    esc(a.s.team) +
+    '</span></div><div class="rec-main"><div class="t">' +
+    esc(dispName(a.s.name)) +
+    ' <span class="mono" style="color:var(--muted);font-weight:500">#' +
+    esc(a.s.id) +
+    '</span></div><div class="m" style="margin-top:3px">' +
+    esc(a.def.l) +
+    ' — ' +
+    (a.tier === 'missing' ? 'not on file' : tierText(a)) +
+    '</div>' +
+    (raised.length
+      ? '<div class="al-trail">Alerts raised: ' +
+        raised.map((r) => TIER_LBL[r.t] + ' (' + dShort(r.at) + ')').join(' · ') +
+        '</div>'
+      : '') +
+    '<div class="al-trail">To: ' +
+    esc(dispName(a.s.name)) +
+    (sics.length ? ' · SIC ' + esc(sics.map((x) => dispName(x.name)).join(' / ')) : '') +
+    '</div></div><div class="al-acts">' +
+    btn('medic', 'Remind medic', n.medic, smsHref([a.s.phone], medicMsg(a))) +
+    (sics.length
+      ? btn(
+          'sic',
+          'Notify SIC',
+          n.sic,
+          smsHref(
+            sics.map((x) => x.phone),
+            sicMsg(a),
+          ),
+        )
+      : '') +
+    '</div></div>'
+  );
+}
+function renderDocs() {
+  const asOf = nowISO();
+  const all = currentAlerts(asOf);
+  const alerts = all.filter((a) => a.tier !== 'missing');
+  const cnt = (t) => alerts.filter((a) => a.tier === t).length;
+  const readyNow = STAFF.filter((s) => staffAssess(s, asOf).ready).length;
+  const pct = STAFF.length ? Math.round((readyNow / STAFF.length) * 100) : 0;
+  $('#docsCount').textContent = alerts.length + ' active alerts';
+  $('#docsKpis').innerHTML = [
+    [
+      pct + '<span class="kpi-unit">%</span>',
+      'Staff ready for duty',
+      pct >= 95 ? 'var(--green)' : pct >= 85 ? 'var(--amber)' : 'var(--red-d)',
+    ],
+    [cnt('expired'), 'Expired', 'var(--red-d)'],
+    [cnt(15), 'Due within 15 days', 'var(--orange)'],
+    [cnt(30) + cnt(60), 'Due in 16–60 days', 'var(--amber)'],
+  ]
+    .map(
+      (x) =>
+        '<div class="kpi mini-k"><div class="n" style="color:' +
+        x[2] +
+        '">' +
+        x[0] +
+        '</div><div class="l">' +
+        x[1] +
+        '</div></div>',
+    )
+    .join('');
+  const perm = notifSupported() ? Notification.permission : 'unsupported';
+  const last = +Store.get('dcas_notif_run') || 0;
+  $('#docsNotif').innerHTML =
+    '<p class="nf-p">Automatic alerts to the medic and their team supervisor at <b>60</b>, <b>30</b> and <b>15</b> days before any license, accreditation, ID, visa or refresher course lapses — and again on expiry — so operational privileges are never interrupted.</p>' +
+    '<div class="btn-row">' +
+    (perm === 'granted'
+      ? '<button class="btn btn-ghost" disabled>\u2713 Notifications on</button>'
+      : perm === 'denied'
+        ? '<button class="btn btn-ghost" disabled title="Allow notifications for this site in browser settings">Notifications blocked</button>'
+        : perm === 'unsupported'
+          ? '<button class="btn btn-ghost" disabled>No device notifications</button>'
+          : '<button class="btn btn-primary" data-act="notif-enable">Enable notifications</button>') +
+    '<button class="btn btn-ghost" data-act="alerts-check">Check now</button></div>' +
+    '<p class="hint" style="margin-bottom:0">Last check ' +
+    (last
+      ? fmtD(localISO(new Date(last))) + ' ' + new Date(last).toTimeString().slice(0, 5)
+      : '—') +
+    ' · checks run automatically on open and every 6 hours.</p>';
+  const teams = ROSTER.teams
+    .map((t) => [t, alerts.filter((a) => a.s.team === t).length])
+    .filter((x) => x[1]);
+  $('#docsDigest').innerHTML = teams.length
+    ? '<div class="menu-label" style="margin-top:4px">Send supervisor digest</div><div class="chips">' +
+      teams
+        .map(
+          (x) =>
+            '<button class="chip" data-act="digest" data-team="' +
+            esc(x[0]) +
+            '">Team ' +
+            esc(x[0]) +
+            ' · ' +
+            x[1] +
+            ' → SIC</button>',
+        )
+        .join('') +
+      '</div>'
+    : '';
+  const chips = [
+    ['active', 'Active', alerts.length],
+    ['expired', 'Expired', cnt('expired')],
+    ['15', '≤ 15 days', cnt(15)],
+    ['30', '≤ 30 days', cnt(30)],
+    ['60', '≤ 60 days', cnt(60)],
+    ['blocking', 'Affects readiness', alerts.filter((a) => a.blocking).length],
+    ['missing', 'Not on file', all.length - alerts.length],
+  ];
+  $('#docsChips').innerHTML = chips
+    .map(
+      (c) =>
+        '<button class="chip ' +
+        (docsFilter === c[0] ? 'active' : '') +
+        '" data-act="docs-filter" data-key="' +
+        c[0] +
+        '">' +
+        c[1] +
+        ' <span style="opacity:.6">' +
+        c[2] +
+        '</span></button>',
+    )
+    .join('');
+  let list =
+    docsFilter === 'missing'
+      ? all.filter((a) => a.tier === 'missing')
+      : docsFilter === 'blocking'
+        ? alerts.filter((a) => a.blocking)
+        : docsFilter === 'active'
+          ? alerts
+          : alerts.filter((a) => String(a.tier) === docsFilter);
+  const q = ($('#docsSearch').value || '').trim().toLowerCase();
+  if (q)
+    list = list.filter(
+      (a) =>
+        (a.s.name + ' ' + a.s.id + ' ' + a.def.l + ' team ' + a.s.team).toLowerCase().indexOf(q) >=
+        0,
+    );
+  $('#docsList').innerHTML = list.length
+    ? list.slice(0, 200).map(alertRow).join('') +
+      (list.length > 200
+        ? '<p class="hint">Showing 200 of ' + list.length + ' — refine the search.</p>'
+        : '')
+    : emptyState(
+        docsFilter === 'missing'
+          ? 'Every required document is on file'
+          : 'No alerts — all documents valid for 60+ days',
+      );
+}
+
+/* ===== shift readiness heatmap ===== */
+const noDocsHint = () =>
+  certifications.length
+    ? ''
+    : '<p class="hint">No staff documents on file yet \u2014 add them from a staff profile, or upload the Staff Documents workbook in <span class="more-l" data-act="go" data-v="upload">Upload Center</span>.</p>';
+function shiftReadyHtml(d, code) {
+  const r = shiftReadiness(d, code);
+  const band = readinessBand(r.pct);
+  const notReady = r.rows.filter((x) => !x.a.ready);
+  const watch = r.rows.filter((x) => x.a.ready && x.a.watch.some((w) => w.blocking));
+  const row = (x, bad) =>
+    '<div class="staff-row rr-row" data-act="staff" data-id="' +
+    esc(x.s.id) +
+    '" data-team="' +
+    esc(x.s.team) +
+    '"><span class="callsign">' +
+    esc(x.s.callsign) +
+    '</span><div class="info"><div class="nm">' +
+    esc(dispName(x.s.name)) +
+    ' <span class="rr-team">Team ' +
+    esc(x.s.team) +
+    '</span></div><div class="sub">' +
+    (bad
+      ? x.a.blockers.map((b) => '<span class="rr-b">' + blockerText(b) + '</span>').join('')
+      : x.a.watch
+          .filter((w) => w.blocking)
+          .map((w) => '<span class="rr-w">' + esc(w.def.l) + ' lapses ' + fmtD(w.exp) + '</span>')
+          .join('')) +
+    '</div></div></div>';
+  return (
+    '<div class="rd-top"><div class="rd-n">' +
+    (r.pct == null ? '—' : r.pct + '<span class="kpi-unit">%</span>') +
+    '</div><div class="rd-meta"><div class="rd-t">' +
+    CODES[code].l +
+    ' shift · ' +
+    esc(dayLabel(d)) +
+    ' ' +
+    bandPill(band) +
+    '</div><div class="rd-s">' +
+    r.ready +
+    '/' +
+    r.crew +
+    ' rostered crew hold valid required licenses & documents on ' +
+    fmtD(rosterISO(d)) +
+    '</div></div></div>' +
+    noDocsHint() +
+    (r.crew
+      ? notReady.length
+        ? '<div class="rr-h">Not ready (' +
+          notReady.length +
+          ')</div>' +
+          notReady.map((x) => row(x, true)).join('')
+        : '<p class="hint">Every rostered crew member is cleared for this shift.</p>'
+      : '<p class="hint">No crew rostered on this shift.</p>') +
+    (watch.length
+      ? '<div class="rr-h">Lapsing within 15 days (' +
+        watch.length +
+        ')</div>' +
+        watch.map((x) => row(x, false)).join('')
+      : '')
+  );
+}
+function viewShiftReady(d, code) {
+  openSheet('Shift readiness', shiftReadyHtml(d, code));
+}
+function renderReadiness() {
+  const days = ROSTER.days || 30;
+  $('#rdyMonth').textContent = ROSTER.month;
+  const grid = {},
+    all = [];
+  for (let d = 1; d <= days; d++) {
+    grid[d] = { D: shiftReadiness(d, 'D'), N: shiftReadiness(d, 'N') };
+    all.push({ d, c: 'D', r: grid[d].D }, { d, c: 'N', r: grid[d].N });
+  }
+  const scored = all.filter((x) => x.r.pct != null);
+  const avg = scored.length
+    ? Math.round(scored.reduce((n, x) => n + x.r.pct, 0) / scored.length)
+    : null;
+  const lowest = scored.slice().sort((a, b) => a.r.pct - b.r.pct || a.d - b.d);
+  const below = scored.filter((x) => x.r.pct < 95).length;
+  const lo = lowest[0];
+  const tile = (n, l, band) =>
+    '<div class="kpi rdy-k b-' +
+    band +
+    '"><div class="n">' +
+    n +
+    '</div><div class="l">' +
+    l +
+    '</div></div>';
+  $('#rdyStats').innerHTML =
+    tile(avg == null ? '—' : avg + '%', 'Month average', readinessBand(avg)) +
+    tile(
+      lo ? lo.r.pct + '%' : '—',
+      lo ? 'Lowest · ' + CODES[lo.c].l + ' ' + lo.d : 'Lowest shift',
+      lo ? readinessBand(lo.r.pct) : 'none',
+    ) +
+    tile(below + '/' + scored.length, 'Shifts below 95%', below ? 'watch' : 'ok');
+  const offset =
+    (new Date(ROSTER.year || 2026, ROSTER.monthIndex == null ? 5 : ROSTER.monthIndex, 1).getDay() +
+      6) %
+    7;
+  let cal =
+    '<div class="hm-cal">' +
+    ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+      .map((w) => '<div class="hm-wd">' + w + '</div>')
+      .join('');
+  for (let i = 0; i < offset; i++) cal += '<div class="hm-day hm-pad"></div>';
+  for (let d = 1; d <= days; d++)
+    cal +=
+      '<div class="hm-day' +
+      (d === day ? ' sel' : '') +
+      '"><div class="hm-dn">' +
+      d +
+      '</div>' +
+      hmCell(d, 'D', grid[d].D) +
+      hmCell(d, 'N', grid[d].N) +
+      '</div>';
+  cal += '</div>';
+  const legend =
+    '<div class="hm-legend">' +
+    [
+      ['ok', '≥ 95% ready'],
+      ['watch', '85–94% watch'],
+      ['risk', '< 85% at risk (!)'],
+      ['none', 'no crew'],
+    ]
+      .map((x) => '<span><i class="hm-sw b-' + x[0] + '"></i>' + x[1] + '</span>')
+      .join('') +
+    '</div>';
+  $('#rdyHeat').innerHTML = noDocsHint() + cal + legend;
+  $('#rdyLow').innerHTML = lowest.length
+    ? lowest
+        .slice(0, 5)
+        .map((x) => {
+          const blk = {};
+          x.r.rows.forEach((row) =>
+            row.a.blockers.forEach((b) => (blk[b.def.sl] = (blk[b.def.sl] || 0) + 1)),
+          );
+          return (
+            '<div class="cov-row rr-low" data-act="ready-shift" data-d="' +
+            x.d +
+            '" data-c="' +
+            x.c +
+            '"><div class="cov-name"><div class="t">' +
+            CODES[x.c].l +
+            ' · ' +
+            esc(dayLabel(x.d)) +
+            '</div><div class="s">' +
+            x.r.ready +
+            '/' +
+            x.r.crew +
+            ' ready' +
+            (Object.keys(blk).length
+              ? ' · ' +
+                Object.entries(blk)
+                  .map((e) => esc(e[0]) + ' ×' + e[1])
+                  .join(', ')
+              : '') +
+            '</div></div><span class="rr-pct">' +
+            x.r.pct +
+            '%</span>' +
+            bandPill(readinessBand(x.r.pct)) +
+            '</div>'
+          );
+        })
+        .join('')
+    : emptyState('No rostered shifts');
+  const blocked = {};
+  all.forEach((x) =>
+    x.r.rows.forEach((row) =>
+      row.a.blockers.forEach((b) => {
+        (blocked[b.def.sl] = blocked[b.def.sl] || {})[row.s.team + row.s.id] = 1;
+      }),
+    ),
+  );
+  const data = Object.entries(blocked)
+    .map(([k, v]) => ({ x: k, y: Object.keys(v).length }))
+    .sort((a, b) => b.y - a.y);
+  $('#rdyBlock').innerHTML = data.length
+    ? barChart(data, 'var(--red)') +
+      '<p class="hint" style="margin-bottom:0">Distinct medics blocked on at least one rostered shift this month, by document.</p>'
+    : '<p class="hint">No document is blocking any rostered shift this month.</p>';
+  $('#rdyPolicy').innerHTML =
+    'Readiness counts: ' +
+    DOC_DEFS.filter((d) => policy.indexOf(d.k) >= 0)
+      .map((d) => esc(d.l) + (d.block === 'adv' ? ' (EMT-A/SIC)' : ''))
+      .join(', ') +
+    '. <span class="more-l" data-act="go" data-v="settings">Change policy →</span>';
+}
+function renderPolicy() {
+  $('#policyList').innerHTML =
+    DOC_GROUPS.map(
+      (g) =>
+        '<div class="doc-gh">' +
+        g.t +
+        '</div>' +
+        DOC_DEFS.filter((d) => d.g === g.k)
+          .map(
+            (d) =>
+              '<label class="shift-staff"><input type="checkbox" data-pol="' +
+              d.k +
+              '"' +
+              (policy.indexOf(d.k) >= 0 ? ' checked' : '') +
+              '><span>' +
+              esc(d.l) +
+              (d.block === 'adv'
+                ? ' <span style="color:var(--muted);font-size:11px">EMT-A & SIC only</span>'
+                : '') +
+              '</span></label>',
+          )
+          .join(''),
+    ).join('') +
+    '<div class="btn-row" style="margin-top:12px"><button class="btn btn-ghost" data-act="policy-reset">Reset to default</button><button class="btn btn-primary" data-act="policy-save">Save policy</button></div>';
+}
+function savePolicy() {
+  policy = Array.from(document.querySelectorAll('#policyList [data-pol]'))
+    .filter((x) => x.checked)
+    .map((x) => x.dataset.pol);
+  Store.set('dcas_policy', JSON.stringify(policy));
+  toast('Readiness policy saved');
+}
+
 /* ===== Excel I/O ===== */
 const hasXLSX = () => typeof XLSX !== 'undefined';
 function renderSettings() {
   $('#xlsxState').textContent = hasXLSX() ? 'ready' : 'loading\u2026';
+  renderPolicy();
 }
 let pickKind = 'roster';
 function renderUpload() {
@@ -2480,10 +3598,17 @@ function renderUpload() {
     ['var(--gold-soft)', 'var(--gold)'],
     'tpl-ach',
   );
+  $('#dropDocs').innerHTML = card(
+    'Upload Staff Documents',
+    'Licenses \u00b7 IDs \u00b7 visas \u00b7 refresher courses \u00b7 qualifications',
+    ['var(--red-soft)', 'var(--red-d)'],
+    'tpl-docs',
+  );
   [
     ['dropRoster', 'roster'],
     ['dropReport', 'report'],
     ['dropAch', 'ach'],
+    ['dropDocs', 'docs'],
   ].forEach((p) => {
     const el = $('#' + p[0]),
       kind = p[1];
@@ -2519,6 +3644,7 @@ function handleFile(file, kind) {
       const wb = XLSX.read(ev.target.result, { type: 'array' });
       if (kind === 'roster') importRoster(wb);
       else if (kind === 'report') importReports(wb);
+      else if (kind === 'docs') importDocs(wb);
       else importAchievements(wb);
     } catch (err) {
       toast('Could not read the file');
@@ -2533,12 +3659,7 @@ function importRoster(wb) {
     return;
   }
   const AIR = { 'Dubai International Airport': 'DXB', 'Al-Maktoum Airport': 'DWC' };
-  const SEC = [
-    'Overtime',
-    'Swap',
-    'ANNUAL LEAVES',
-    'SPECIAL DUTY',
-  ];
+  const SEC = ['Overtime', 'Swap', 'ANNUAL LEAVES', 'SPECIAL DUTY'];
   const REL = ['RELIEVERS', 'RELIEVERS from Other Areas'];
   const out = [];
   dotted.forEach((sn) => {
@@ -2565,8 +3686,16 @@ function importRoster(wb) {
         airport = AIR[c[0]];
         supp = false;
       }
-      if (SEC.indexOf(c[0]) >= 0) { supp = true; return; }
-      if (REL.indexOf(c[0]) >= 0) { term = ''; area = ''; cs = ''; return; }
+      if (SEC.indexOf(c[0]) >= 0) {
+        supp = true;
+        return;
+      }
+      if (REL.indexOf(c[0]) >= 0) {
+        term = '';
+        area = '';
+        cs = '';
+        return;
+      }
       if (supp) return;
       if (c[0] && !AIR[c[0]]) term = c[0];
       if (c[1]) area = c[1];
@@ -2698,6 +3827,182 @@ function tplAch() {
     ],
   });
 }
+/* --- staff documents workbook (template = current records, so it round-trips) --- */
+const docCol = (d) => d.l + (d.months ? ' (completed)' : ' (expiry)');
+function docsSheets() {
+  const docs = [['Staff ID', 'Team', 'Name', 'Title'].concat(DOC_DEFS.map(docCol))],
+    quals = [['Staff ID', 'Team', 'Name', 'Qualification', 'Institution', 'Year', 'Attested']],
+    train = [['Staff ID', 'Team', 'Name', 'Course', 'Provider', 'Date', 'Hours']];
+  STAFF.forEach((s) => {
+    const r = getStaffCerts(s.id, s.team) || {},
+      c = r.certs || {},
+      nm = dispName(s.name);
+    docs.push(
+      [s.id, s.team, nm, s.title].concat(
+        DOC_DEFS.map((d) => (c[d.k] === 'na' ? 'N/A' : c[d.k] || '')),
+      ),
+    );
+    (r.quals || []).forEach((q) =>
+      quals.push([s.id, s.team, nm, q.title, q.inst, q.year, q.attested ? 'Yes' : 'No']),
+    );
+    (r.training || []).forEach((t) =>
+      train.push([s.id, s.team, nm, t.course, t.provider, t.date, t.hours]),
+    );
+  });
+  return { Documents: docs, Qualifications: quals, Training: train };
+}
+function alertRows() {
+  return currentAlerts(nowISO()).map((a) => {
+    const n = notifLog[a.key] || {};
+    const at = (t) => (t ? localISO(new Date(t)) : '');
+    return {
+      Name: dispName(a.s.name),
+      'Staff ID': a.s.id,
+      Team: a.s.team,
+      Document: a.def.l,
+      Expiry: a.exp || '',
+      'Days left': a.tier === 'missing' ? '' : a.days,
+      Alert: TIER_LBL[a.tier],
+      'Affects readiness': a.blocking ? 'Yes' : 'No',
+      Supervisors: teamSics(a.s.team)
+        .map((x) => dispName(x.name))
+        .join(', '),
+      Raised: at(n.at),
+      'Medic notified': at(n.medic),
+      'SIC notified': at(n.sic),
+    };
+  });
+}
+function readinessRows() {
+  const out = [];
+  for (let d = 1; d <= (ROSTER.days || 30); d++)
+    ['D', 'N'].forEach((c) => {
+      const r = shiftReadiness(d, c);
+      out.push({
+        Date: rosterISO(d),
+        Shift: CODES[c].l,
+        Crew: r.crew,
+        Ready: r.ready,
+        'Readiness %': r.pct == null ? '' : r.pct,
+        'Not ready': r.rows
+          .filter((x) => !x.a.ready)
+          .map((x) => dispName(x.s.name) + ' (' + x.a.blockers.map((b) => b.def.sl).join('/') + ')')
+          .join('; '),
+      });
+    });
+  return out;
+}
+function tplDocs() {
+  writeBook('staff-documents-' + today() + '.xlsx', docsSheets());
+}
+function exportAlerts() {
+  writeBook('expiry-alerts-' + today() + '.xlsx', { 'Expiry Alerts': alertRows() });
+}
+function importDocs(wb) {
+  const norm = (h) =>
+    String(h)
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '');
+  const sheetOf = (word) => {
+    const n = wb.SheetNames.filter((x) => norm(x).indexOf(word) >= 0)[0];
+    return n ? XLSX.utils.sheet_to_json(wb.Sheets[n], { defval: '' }) : null;
+  };
+  const col = (row, test) => Object.keys(row).filter((k) => test(norm(k)))[0];
+  const staffOf = (row) => {
+    const ik = col(row, (n) => n === 'staffid' || n === 'id' || n === 'employeeid'),
+      tk = col(row, (n) => n === 'team');
+    const id = ik ? String(row[ik]).replace(/\.0$/, '').trim() : '';
+    if (!id) return null;
+    const team = tk ? String(row[tk]).trim() : '';
+    return (
+      findStaff(id, team) ||
+      STAFF.filter(
+        (x) => x.id.replace(/^0+/, '') === id.replace(/^0+/, '') && (!team || x.team === team),
+      )[0]
+    );
+  };
+  const recOf = (s) => {
+    let r = getStaffCerts(s.id, s.team);
+    if (!r) {
+      r = { staffId: s.id, staffTeam: s.team };
+      certifications.push(r);
+    }
+    r.certs = r.certs || {};
+    return r;
+  };
+  const touched = {};
+  let unknown = 0;
+  (
+    sheetOf('document') || XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' })
+  ).forEach((row) => {
+    const s = staffOf(row);
+    if (!s) return void unknown++;
+    const r = recOf(s);
+    DOC_DEFS.forEach((d) => {
+      const k = col(
+        row,
+        (n) => n === norm(d.l) || n === norm(docCol(d)) || n === norm(d.k) || n === norm(d.sl),
+      );
+      const v = k ? normDate(row[k]) : '';
+      if (!v || (v === 'na' && !d.na) || r.certs[d.k] === v) return;
+      r.certs[d.k] = v;
+      touched[s.team + s.id] = r;
+    });
+  });
+  const lists = [
+    [
+      'qualif',
+      'quals',
+      (row) => ({
+        title: String(row[col(row, (n) => n.indexOf('qualif') === 0)] || '').trim(),
+        inst: String(row[col(row, (n) => n.indexOf('institut') === 0)] || '').trim(),
+        year: String(row[col(row, (n) => n === 'year')] || '').replace(/\.0$/, ''),
+        attested: /^(y|yes|true|1)/i.test(
+          String(row[col(row, (n) => n.indexOf('attest') === 0)] || ''),
+        ),
+      }),
+      'title',
+    ],
+    [
+      'training',
+      'training',
+      (row) => ({
+        course: String(row[col(row, (n) => n.indexOf('course') === 0)] || '').trim(),
+        provider: String(row[col(row, (n) => n.indexOf('provider') === 0)] || '').trim(),
+        date: normDate(row[col(row, (n) => n === 'date')]),
+        hours: +row[col(row, (n) => n.indexOf('hour') === 0)] || 0,
+      }),
+      'course',
+    ],
+  ];
+  lists.forEach(([word, field, parse, need]) => {
+    const rows = sheetOf(word);
+    if (!rows) return;
+    const fresh = {};
+    rows.forEach((row) => {
+      const s = staffOf(row);
+      const item = s && parse(row);
+      if (!item || !item[need]) return;
+      const r = recOf(s);
+      if (!fresh[s.team + s.id]) ((fresh[s.team + s.id] = 1), (r[field] = []));
+      r[field].push(item);
+      touched[s.team + s.id] = r;
+    });
+  });
+  const n = Object.keys(touched).length;
+  Object.values(touched).forEach((r) => {
+    delete r.sample;
+    r.updatedAt = Date.now();
+  });
+  saveCert();
+  runAlertEngine();
+  toast(
+    n +
+      ' staff record(s) updated' +
+      (unknown ? ' \u00b7 ' + unknown + ' unknown ID(s) skipped' : ''),
+  );
+  go('docs');
+}
 function exportAllExcel() {
   if (!hasXLSX()) {
     toast('Excel engine not ready');
@@ -2740,26 +4045,9 @@ function exportAllExcel() {
       Completed: i.completedDate,
       Impact: i.impact,
     })),
-    Certifications: certifications.flatMap((r) => {
-      const s =
-        STAFF.filter((x) => x.id === r.staffId && x.team === r.staffTeam)[0] ||
-        STAFF.filter((x) => x.id === r.staffId)[0];
-      return Object.entries(r.certs || {}).map(([k, d]) => ({
-        Name: s ? dispName(s.name) : r.staffId,
-        'Staff ID': r.staffId,
-        Certification:
-          {
-            bls: 'BLS',
-            acls: 'ACLS',
-            pals: 'PALS',
-            phtls: 'PHTLS',
-            driving: 'Driving Permit',
-            airport: 'Airport Permit',
-          }[k] || k,
-        'Expiry Date': d,
-        Status: certStatus(d),
-      }));
-    }),
+    ...docsSheets(),
+    'Expiry Alerts': alertRows(),
+    'Shift Readiness': readinessRows(),
     'Shift Reports': shiftReports.map((r) => ({
       Date: r.date,
       Shift: r.shift,
@@ -2784,7 +4072,9 @@ function resetSample() {
 }
 function clearAll() {
   if (
-    !confirm('Clear ALL records (reports, challenges, achievements, initiatives, shift reports)?')
+    !confirm(
+      'Clear ALL records (reports, challenges, achievements, initiatives, shift reports, staff documents)?',
+    )
   )
     return;
   reports = [];
@@ -2793,6 +4083,9 @@ function clearAll() {
   initiatives = [];
   certifications = [];
   shiftReports = [];
+  notifLog = {};
+  saveNotif();
+  Store.set('dcas_docs_v', '1');
   saveRep();
   saveCh();
   saveAch();
@@ -2805,13 +4098,24 @@ function clearAll() {
 }
 
 /* ===== shared ===== */
+let sheetCleanup = null;
+function runSheetCleanup() {
+  if (sheetCleanup) {
+    const f = sheetCleanup;
+    sheetCleanup = null;
+    f();
+  }
+}
 function openSheet(t, h) {
+  runSheetCleanup();
   $('#sheetTitle').textContent = t;
   $('#sheetBody').innerHTML = h;
+  $('#sheet').scrollTop = 0;
   $('#scrim').classList.add('open');
   $('#sheet').classList.add('open');
 }
 function closeSheet() {
+  runSheetCleanup();
   $('#scrim').classList.remove('open');
   $('#sheet').classList.remove('open');
 }
@@ -2879,6 +4183,36 @@ const ACTIONS = {
   },
   'stf-cert': (a) => editStfCerts(a.id, a.team),
   'stf-cert-save': (a) => saveStfCerts(a.id, a.team),
+  'stf-qr': (a) => viewQr(a.id, a.team),
+  'qr-png': (a) => downloadQrPng(a.id, a.team),
+  'qr-link': (a) => copyQrLink(a.id, a.team),
+  'qual-add': () => $('#qualRows').insertAdjacentHTML('beforeend', qualRow({})),
+  'train-add': () => $('#trainRows').insertAdjacentHTML('beforeend', trainRow({})),
+  'row-del': (_a, el) => el.closest('.erow').remove(),
+  scan: () => openScanner(),
+  'verify-id': () => verifyById(),
+  'docs-filter': (a) => {
+    docsFilter = a.key;
+    renderDocs();
+  },
+  'docs-staff': (a) => viewStaff(a.id, a.team),
+  notify: (a) => sendNotice(a),
+  digest: (a) => sendDigest(a.team),
+  'notif-enable': () => enableNotifications(),
+  'alerts-check': () => {
+    runAlertEngine(true);
+    renderDocs();
+  },
+  'alerts-export': () => exportAlerts(),
+  'ready-shift': (a) => viewShiftReady(+a.d, a.c),
+  'policy-save': () => savePolicy(),
+  'policy-reset': () => {
+    policy = defaultPolicy();
+    Store.set('dcas_policy', JSON.stringify(policy));
+    renderSettings();
+    toast('Readiness policy reset');
+  },
+  'tpl-docs': () => tplDocs(),
   'shift-new': () => editShift(null),
   'shift-view': (a) => viewShift(a.id),
   'shift-edit': (a) => editShift(a.id),
@@ -2899,7 +4233,7 @@ document.addEventListener('click', (e) => {
   const fn = ACTIONS[el.dataset.act];
   if (fn) {
     e.preventDefault();
-    fn(el.dataset);
+    fn(el.dataset, el);
   }
 });
 $('#fileIn').addEventListener('change', (e) => {
@@ -2911,6 +4245,7 @@ $('#fileIn').addEventListener('change', (e) => {
   'achSearch|renderAch',
   'initSearch|renderInit',
   'shiftSearch|renderShift',
+  'docsSearch|renderDocs',
 ].forEach((p) => {
   const id = p.split('|')[0],
     fn = {
@@ -2919,6 +4254,7 @@ $('#fileIn').addEventListener('change', (e) => {
       renderAch: renderAch,
       renderInit: renderInit,
       renderShift: renderShift,
+      renderDocs: renderDocs,
     }[p.split('|')[1]];
   $('#' + id).addEventListener('input', deb(fn, 150));
 });
@@ -2935,6 +4271,16 @@ try {
     }
   }
 } catch (e) {}
+
+/* first run: demo data. Existing installs get the document set once, unless real records exist. */
+if (!Store.get('dcas_seeded')) seedSample(false);
+else if (!Store.get('dcas_docs_v')) {
+  if (!certifications.some((r) => STAFF.some((x) => x.id === r.staffId))) {
+    certifications = seedDocs();
+    saveCert();
+  }
+  Store.set('dcas_docs_v', '1');
+}
 
 /* install banner */
 let deferredPrompt = null;
@@ -3000,3 +4346,14 @@ function toggleTheme() {
 })();
 
 go(view);
+handleHash();
+window.addEventListener('hashchange', handleHash);
+runAlertEngine();
+setInterval(() => runAlertEngine(), 6 * 3600 * 1000);
+document.addEventListener('visibilitychange', () => {
+  if (
+    document.visibilityState === 'visible' &&
+    Date.now() - (+Store.get('dcas_notif_run') || 0) > 3600 * 1000
+  )
+    runAlertEngine();
+});
