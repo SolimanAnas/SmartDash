@@ -12,7 +12,7 @@ An offline-first **Progressive Web App** for the **Dubai Corporation for Ambulan
 - **Operations** — terminal coverage, station staffing, who's on duty.
 - **Roster** — the 4-platoon (A/B/C/D) monthly shift schedule.
 - **Records** — challenges (issue tracker), monthly KPI reports, staff achievements, and digital-transformation initiatives.
-- **Paramedic documents** — one permanent record per medic for licenses & accreditations, personal documents (Emirates ID, passport, residence visa), refresher courses, academic qualifications and training path, with predictive expiry alerts (60/30/15 days), a QR code profile per medic, and a shift-readiness heatmap.
+- **Medic documents** — one permanent record per medic for licenses & accreditations, personal documents (Emirates ID, passport, residence visa), refresher courses, academic qualifications and training path, with predictive expiry alerts (60/30/15 days), a QR code profile per medic, and a shift-readiness heatmap.
 - **Analytics** — KPI trends (cases, response time, ROSC) and staffing distributions.
 
 It is the Phase-1 deliverable of a departmental digital-transformation initiative. Target deployment is a **Capacitor** Android wrapper around the single built HTML file.
@@ -39,6 +39,7 @@ proj/
 ├── src/
 │   ├── util.js         # pure helpers (exports). No DOM, no state.
 │   ├── docs.js         # pure staff-documents logic: definitions, 60/30/15 tiers, readiness, QR payload.
+│   ├── backup.js       # pure backup/restore/merge logic, change tracking, schema migrations.
 │   ├── qr.js           # dependency-free QR Code encoder (byte mode, ECC M) → SVG.
 │   ├── app.js          # the application: state, views, Excel I/O, dispatcher.
 │   ├── style.css       # extracted CSS, minified via esbuild at build time.
@@ -102,7 +103,8 @@ Each `renderX()` builds an HTML string and assigns it to a container once (singl
 
 ### Storage
 `Store` wrapper = `localStorage` with an **in-memory fallback** (so a sandboxed/blocked environment doesn't crash). Always use `Store.get/set`, never `localStorage` directly.
-Keys: `dcas_ch`, `dcas_rep`, `dcas_ach`, `dcas_init`, `dcas_cert` (staff documents), `dcas_shift` (records), `dcas_notif` (raised expiry alerts), `dcas_notif_run` (last alert check), `dcas_policy` (readiness policy), `dcas_roster` (uploaded-roster override), `dcas_seeded` / `dcas_docs_v` (sample-data flags).
+**Always save records through the `saveX()` helpers** (they call `persist()`), never `Store.set` on a record key directly: `persist()` stamps `updatedAt`, records deletions as tombstones and counts changes for the backup reminder. Backup/restore/merge logic lives in `backup.js` (see `docs/backup_restore.md`). If a record shape changes, bump `SCHEMA_VERSION` and add a step to `migrate()`.
+Keys: `dcas_ch`, `dcas_rep`, `dcas_ach`, `dcas_init`, `dcas_cert` (staff documents), `dcas_shift` (records), `dcas_notif` (raised expiry alerts), `dcas_notif_run` (last alert check), `dcas_policy` (readiness policy), `dcas_roster` (uploaded-roster override), `dcas_seeded` / `dcas_docs_v` (sample-data flags), `dcas_schema` (stored data version), `dcas_sigs` / `dcas_tomb` (change tracking, tombstones), `dcas_dirty` / `dcas_last_backup` (backup reminder), `dcas_undo` (safety copy before a restore), `dcas_device` (device id in backups).
 `seedSample()` loads demo reports/challenges on first run (flagged) so dashboards aren't empty for demos; Settings can reset/clear.
 
 ### Derived operations data
@@ -202,7 +204,7 @@ Excel template columns:
 
 ## 9. Current features (done)
 
-Dashboard (live status band + document-expiry badge + shift-readiness card with 7-day strip + 6 management KPIs + response-time sparkline + coverage), Command Center (terminal status map + coverage + shift readiness for the selected shift + drill-down), Roster (4-team rotation strips + on-duty list), Challenges (CRUD + filters + stats), Shift Reports, Monthly Reports (CRUD + Excel import + template), Analytics (SVG bar/line charts), Staff Directory + Employee Portfolio (readiness banner, licenses & accreditations, personal documents, refresher courses, academic qualifications, training path, attendance, linked achievements/initiatives, tap-to-call, shift calendar), **Paramedic documents** (documents editor, Documents & Alerts view with 60/30/15-day predictive expiry alerts, device notifications, SMS reminders to medic/SIC and team digests, QR code profile per medic with badge download and verification by scan or staff ID, Shift Readiness heatmap with drill-down, lowest shifts and blocking documents, configurable readiness policy, Excel workbook import/export), Achievements & Initiatives (CRUD), Upload Center (drag-drop Excel: roster/report/achievement/staff documents + templates), Settings (Excel export, readiness policy, reset/clear, roadmap), PWA (manifest.json, service worker with cache-first + offline fallback + notification taps, install banner toast, 404 page), Playwright test suite (37 tests: PWA validity, QR decoding, documents logic, app functionality), CI/CD (GitHub Actions: lint → format check → build → test), Event delegation, hardened escaping, debounced search, esbuild build pipeline.
+Dashboard (live status band + document-expiry badge + shift-readiness card with 7-day strip + 6 management KPIs + response-time sparkline + coverage), Command Center (terminal status map + coverage + shift readiness for the selected shift + drill-down), Roster (4-team rotation strips + on-duty list), Challenges (CRUD + filters + stats), Shift Reports, Monthly Reports (CRUD + Excel import + template), Analytics (SVG bar/line charts), Staff Directory + Employee Portfolio (readiness banner, licenses & accreditations, personal documents, refresher courses, academic qualifications, training path, attendance, linked achievements/initiatives, tap-to-call, shift calendar), **Medic documents** (documents editor, Documents & Alerts view with 60/30/15-day predictive expiry alerts, device notifications, SMS reminders to medic/SIC and team digests, QR code profile per medic with badge download and verification by scan or staff ID, Shift Readiness heatmap with drill-down, lowest shifts and blocking documents, configurable readiness policy, Excel workbook import/export), Achievements & Initiatives (CRUD), Upload Center (drag-drop Excel: roster/report/achievement/staff documents + templates), Settings (Excel export, readiness policy, reset/clear, roadmap), PWA (manifest.json, service worker with cache-first + offline fallback + notification taps, install banner toast, 404 page), Playwright test suite (51 tests: PWA validity, QR decoding, documents logic, backup/restore, app functionality), CI/CD (GitHub Actions: lint → format check → build → test), Event delegation, hardened escaping, debounced search, esbuild build pipeline.
 
 ---
 
@@ -212,7 +214,7 @@ Dashboard (live status band + document-expiry badge + shift-readiness card with 
 npm run lint              # must pass (0 errors)
 npm run format:check      # must pass
 npm run build             # must succeed
-npm test                  # must pass (37 Playwright tests)
+npm test                  # must pass (51 Playwright tests)
 ```
 Then open `dist/dcas-airport-platform.html` or the built root `index.html` in a browser and click through every view + open/edit/save one record of each type. (esbuild catches syntax/import errors; Playwright covers navigation and core flows — still exercise the UI for visual regressions.)
 
@@ -231,7 +233,7 @@ Then open `dist/dcas-airport-platform.html` or the built root `index.html` in a 
 - **DOMPurify** — unnecessary given delegation + `esc()`; do not add.
 - **Full decomposition of the stateful core into many modules** — optional; do incrementally, never in one risky pass.
 
-### Paramedic documents — next steps that need a backend
+### Medic documents — next steps that need a backend
 - Server-side delivery of expiry alerts (push/SMS/email to each medic's own device without a supervisor tapping send) and signed QR badges. The alert log (`notifLog`) and the QR payload format are designed to be handed to that service unchanged.
 
 ### Out of scope until a data-layer decision is made (with DCAS IT)

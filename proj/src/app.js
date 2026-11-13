@@ -20,6 +20,21 @@ import {
   sampleDossier,
   QR_DEFS,
 } from './docs.js';
+import {
+  COLLECTIONS,
+  SCHEMA_VERSION,
+  collOf,
+  track,
+  sigsOf,
+  migrate,
+  toSheets,
+  fromSheets,
+  merge,
+  statTotals,
+  keyOf,
+  sheetsToWorkbook,
+  workbookToSheets,
+} from './backup.js';
 
 /* ===== utilities ===== */
 const $ = (s) => document.querySelector(s);
@@ -62,6 +77,13 @@ const Store = (() => {
         mem[k] = v;
       }
     },
+    del: (k) => {
+      try {
+        ok ? localStorage.removeItem(k) : delete mem[k];
+      } catch (e) {
+        delete mem[k];
+      }
+    },
   };
 })();
 let challenges = JSON.parse(Store.get('dcas_ch') || '[]');
@@ -70,15 +92,61 @@ let achievements = JSON.parse(Store.get('dcas_ach') || '[]');
 let initiatives = JSON.parse(Store.get('dcas_init') || '[]');
 let certifications = JSON.parse(Store.get('dcas_cert') || '[]');
 let shiftReports = JSON.parse(Store.get('dcas_shift') || '[]');
-const saveCh = () => Store.set('dcas_ch', JSON.stringify(challenges));
-const saveRep = () => Store.set('dcas_rep', JSON.stringify(reports));
-const saveAch = () => Store.set('dcas_ach', JSON.stringify(achievements));
-const saveInit = () => Store.set('dcas_init', JSON.stringify(initiatives));
-const saveShiftR = () => Store.set('dcas_shift', JSON.stringify(shiftReports));
 let notifLog = JSON.parse(Store.get('dcas_notif') || '{}');
 let policy = JSON.parse(Store.get('dcas_policy') || 'null') || defaultPolicy();
+
+/* ===== change tracking (backup & merge) =====
+ * Every save goes through persist(): changed records get updatedAt, deletions leave a
+ * tombstone, and real (non-sample) changes count toward the "back up" reminder. */
+const LISTS = {
+  challenges: () => challenges,
+  reports: () => reports,
+  achievements: () => achievements,
+  initiatives: () => initiatives,
+  certifications: () => certifications,
+  shiftReports: () => shiftReports,
+};
+const listState = () => {
+  const o = {};
+  COLLECTIONS.forEach((c) => (o[c.k] = LISTS[c.k]()));
+  return o;
+};
+if ((+Store.get('dcas_schema') || 0) < SCHEMA_VERSION) {
+  migrate(listState(), +Store.get('dcas_schema') || 0);
+  COLLECTIONS.forEach((c) => Store.set(c.store, JSON.stringify(LISTS[c.k]())));
+  Store.set('dcas_schema', String(SCHEMA_VERSION));
+}
+let sigStore = JSON.parse(Store.get('dcas_sigs') || 'null');
+if (!sigStore) {
+  sigStore = {};
+  COLLECTIONS.forEach((c) => (sigStore[c.k] = sigsOf(c, LISTS[c.k]())));
+  Store.set('dcas_sigs', JSON.stringify(sigStore));
+}
+let tombs = JSON.parse(Store.get('dcas_tomb') || '{}');
+const dirtyCount = () => +Store.get('dcas_dirty') || 0;
+function persist(k) {
+  const c = collOf(k),
+    list = LISTS[k](),
+    now = Date.now();
+  const r = track(c, list, sigStore[k] || {}, now);
+  sigStore[k] = r.sigs;
+  const t = (tombs[k] = tombs[k] || {});
+  r.deleted.forEach((key) => (t[key] = now));
+  Object.keys(t).forEach((key) => {
+    if (key in r.sigs) delete t[key];
+  });
+  Store.set(c.store, JSON.stringify(list));
+  Store.set('dcas_sigs', JSON.stringify(sigStore));
+  Store.set('dcas_tomb', JSON.stringify(tombs));
+  if (r.changed) Store.set('dcas_dirty', String(dirtyCount() + r.changed));
+}
+const saveCh = () => persist('challenges');
+const saveRep = () => persist('reports');
+const saveAch = () => persist('achievements');
+const saveInit = () => persist('initiatives');
+const saveShiftR = () => persist('shiftReports');
 const saveCert = () => {
-  Store.set('dcas_cert', JSON.stringify(certifications));
+  persist('certifications');
   _expCache = null;
 };
 const saveNotif = () => Store.set('dcas_notif', JSON.stringify(notifLog));
@@ -306,6 +374,7 @@ function seedSample(force) {
   saveShiftR();
   Store.set('dcas_seeded', '1');
   Store.set('dcas_docs_v', '1');
+  Store.set('dcas_dirty', '0');
   if (force) {
     go('dashboard');
     runAlertEngine();
@@ -513,6 +582,7 @@ function mLabel(m) {
 }
 
 function renderDashboard() {
+  renderBackupNudge();
   $('#dsDate').textContent = 'June ' + day;
   $('#dsWd').textContent = dateOf(day).toLocaleDateString('en-US', { weekday: 'long' });
   $('#dsToday').classList.toggle('show', day !== TODAY);
@@ -3610,6 +3680,7 @@ function savePolicy() {
 const hasXLSX = () => typeof XLSX !== 'undefined';
 function renderSettings() {
   $('#xlsxState').textContent = hasXLSX() ? 'ready' : 'loading\u2026';
+  renderBackupCard();
   renderPolicy();
 }
 let pickKind = 'roster';
@@ -3687,7 +3758,8 @@ function handleFile(file, kind) {
   r.onload = (ev) => {
     try {
       const wb = XLSX.read(ev.target.result, { type: 'array' });
-      if (kind === 'roster') importRoster(wb);
+      if (kind === 'backup') importBackup(wb);
+      else if (kind === 'roster') importRoster(wb);
       else if (kind === 'report') importReports(wb);
       else if (kind === 'docs') importDocs(wb);
       else importAchievements(wb);
@@ -4117,11 +4189,29 @@ function exportAllExcel() {
   });
   toast('Exported to Excel');
 }
+/* Before anything destructive: offer a backup if this device has changes not in one. */
+function offerBackupFirst() {
+  const n = dirtyCount();
+  if (
+    n &&
+    confirm(
+      n +
+        ' change' +
+        (n > 1 ? 's' : '') +
+        ' on this device ' +
+        (n > 1 ? 'are' : 'is') +
+        ' not in any backup.\n\nDownload a backup first? (OK = back up, Cancel = skip)',
+    )
+  )
+    backupNow();
+}
 function resetSample() {
+  offerBackupFirst();
   if (!confirm('Reload demo data? This replaces current records.')) return;
   seedSample(true);
 }
 function clearAll() {
+  offerBackupFirst();
   if (
     !confirm(
       'Clear ALL records (reports, challenges, achievements, initiatives, shift reports, staff documents)?',
@@ -4146,6 +4236,274 @@ function clearAll() {
   Store.set('dcas_seeded', '1');
   go('dashboard');
   toast('All records cleared');
+}
+
+/* ===== backup & restore ===== */
+const DATA_KEYS = COLLECTIONS.map((c) => c.store).concat([
+  'dcas_notif',
+  'dcas_notif_run',
+  'dcas_policy',
+  'dcas_roster',
+  'dcas_sigs',
+  'dcas_tomb',
+  'dcas_schema',
+  'dcas_dirty',
+  'dcas_seeded',
+  'dcas_docs_v',
+  'dcas_last_backup',
+]);
+const deviceId =
+  Store.get('dcas_device') ||
+  (() => {
+    const d = uid();
+    Store.set('dcas_device', d);
+    return d;
+  })();
+const deviceLabel = () => 'Device ' + deviceId.slice(-4).toUpperCase();
+const rosterOverride = () => {
+  try {
+    return JSON.parse(Store.get('dcas_roster') || 'null');
+  } catch (e) {
+    return null;
+  }
+};
+function localState() {
+  return Object.assign(listState(), {
+    tombstones: tombs,
+    notifLog,
+    policy: JSON.parse(Store.get('dcas_policy') || 'null'),
+    roster: rosterOverride(),
+  });
+}
+const realRecords = () =>
+  COLLECTIONS.reduce((n, c) => n + LISTS[c.k]().filter((r) => !r.sample).length, 0);
+let storagePersisted = null;
+if (navigator.storage && navigator.storage.persist)
+  navigator.storage
+    .persisted()
+    .then((p) => p || navigator.storage.persist())
+    .then((p) => {
+      storagePersisted = !!p;
+      if (view === 'settings') renderBackupCard();
+    })
+    .catch(() => {});
+
+function backupNow() {
+  if (!hasXLSX()) {
+    toast('Excel engine still loading \u2014 try again');
+    return false;
+  }
+  const now = Date.now(),
+    d = new Date(now),
+    p2 = (n) => String(n).padStart(2, '0');
+  try {
+    XLSX.writeFile(
+      sheetsToWorkbook(
+        XLSX,
+        toSheets(localState(), { createdAt: now, device: deviceLabel(), deviceId }),
+      ),
+      'smartdash-backup-' + localISO(d) + '-' + p2(d.getHours()) + p2(d.getMinutes()) + '.xlsx',
+    );
+  } catch (e) {
+    toast('Backup failed: ' + e.message);
+    return false;
+  }
+  Store.set('dcas_last_backup', String(now));
+  Store.set('dcas_dirty', '0');
+  toast('Backup saved \u2014 keep it on DCAS-approved storage');
+  if (view === 'settings') renderBackupCard();
+  if (view === 'dashboard') renderBackupNudge();
+  return true;
+}
+function backupStatus() {
+  const last = +Store.get('dcas_last_backup') || 0,
+    dirty = dirtyCount();
+  const days = last ? Math.floor((Date.now() - last) / 86400000) : null;
+  const ago =
+    days == null ? '' : days === 0 ? 'today' : days === 1 ? 'yesterday' : days + ' days ago';
+  const level = !dirty
+    ? 'ok'
+    : !last || days >= 14
+      ? 'bad'
+      : days >= 7 || dirty >= 20
+        ? 'warn'
+        : 'ok';
+  return { last, dirty, days, ago, level };
+}
+function renderBackupNudge() {
+  const el = $('#backupNudge');
+  if (!el) return;
+  const b = backupStatus();
+  const show = realRecords() > 0 && b.dirty > 0 && (!b.last || b.days >= 7 || b.dirty >= 20);
+  el.innerHTML = show
+    ? '<div class="bk-nudge bk-' +
+      b.level +
+      '"><div><b>' +
+      (b.last ? 'Last backup ' + b.ago : 'No backup yet') +
+      '</b><span>' +
+      b.dirty +
+      ' change' +
+      (b.dirty > 1 ? 's' : '') +
+      ' exist only on this device</span></div><button class="btn btn-primary btn-sm" data-act="backup-now">Back up now</button></div>'
+    : '';
+}
+function renderBackupCard() {
+  const el = $('#backupCard');
+  if (!el) return;
+  const b = backupStatus();
+  let undo = null;
+  try {
+    undo = JSON.parse(Store.get('dcas_undo') || 'null');
+  } catch (e) {
+    undo = null;
+  }
+  el.innerHTML =
+    '<div class="bk-status bk-' +
+    b.level +
+    '"><b>' +
+    (b.last ? 'Last backup: ' + b.ago : 'No backup yet') +
+    '</b><span>' +
+    (b.dirty
+      ? b.dirty + ' change' + (b.dirty > 1 ? 's' : '') + ' since then exist only on this device'
+      : 'Everything on this device is in a backup') +
+    '</span></div>' +
+    '<div class="btn-row"><button class="btn btn-primary" data-act="backup-now">Back up now</button><button class="btn btn-ghost" data-act="restore-pick">Restore from backup</button></div>' +
+    (undo
+      ? '<button class="btn btn-ghost" style="margin-top:8px;width:100%" data-act="restore-undo">Undo last restore (' +
+        esc(new Date(undo.at).toLocaleString('en-GB')) +
+        ')</button>'
+      : '') +
+    '<p class="hint">One Excel file with every record, setting and alert. It contains staff personal data: save it only to DCAS-approved storage such as the division SharePoint or your work OneDrive.</p><p class="hint">Storage on this device: ' +
+    (storagePersisted == null
+      ? 'checking\u2026'
+      : storagePersisted
+        ? '<b>protected</b> from automatic clearing by the browser.'
+        : '<b>not protected</b> \u2014 the browser may clear it when space is low. Install the app to the home screen, and back up regularly.') +
+    ' Clearing site data or losing the device still erases it.</p>';
+}
+
+let pendingRestore = null;
+function importBackup(wb) {
+  let parsed;
+  try {
+    parsed = fromSheets(workbookToSheets(XLSX, wb));
+  } catch (e) {
+    toast(e.message);
+    return;
+  }
+  pendingRestore = parsed;
+  const local = localState();
+  const m = merge(local, parsed.state);
+  const t = statTotals(m.stats);
+  let lost = 0;
+  COLLECTIONS.forEach((c) => {
+    const inFile = {};
+    (parsed.state[c.k] || []).forEach((r) => (inFile[keyOf(c, r)] = 1));
+    lost += local[c.k].filter((r) => !r.sample && !inFile[keyOf(c, r)]).length;
+  });
+  const rows = COLLECTIONS.map((c) => {
+    const st = m.stats[c.k];
+    return (
+      '<tr><td>' +
+      esc(c.t) +
+      '</td><td>' +
+      (parsed.state[c.k] || []).length +
+      '</td><td>' +
+      (st.added || '\u2013') +
+      '</td><td>' +
+      (st.updated || '\u2013') +
+      '</td><td>' +
+      (st.kept || '\u2013') +
+      '</td><td>' +
+      (st.removed || '\u2013') +
+      '</td></tr>'
+    );
+  }).join('');
+  const meta = parsed.meta;
+  openSheet(
+    'Restore backup',
+    '<div class="bk-status bk-ok"><b>Backup of ' +
+      esc(new Date(meta.createdAt).toLocaleString('en-GB')) +
+      '</b><span>' +
+      esc(meta.device || 'Unknown device') +
+      (meta.deviceId === deviceId ? ' (this device)' : ' (another device)') +
+      '</span></div>' +
+      '<div class="bk-table-wrap"><table class="bk-table"><thead><tr><th></th><th>In file</th><th>New</th><th>Newer in file</th><th>Newer here</th><th>Deleted in file</th></tr></thead><tbody>' +
+      rows +
+      '</tbody></table></div>' +
+      '<div class="bk-opt"><b>Merge (recommended)</b><span>Adds ' +
+      t.added +
+      ' new and ' +
+      t.updated +
+      ' updated record(s) and applies ' +
+      t.removed +
+      ' deletion(s). The newest version of every record is kept, from either side. Settings on this device stay as they are.</span><button class="btn btn-primary" data-act="restore-apply" data-mode="merge">Merge into this device</button></div>' +
+      '<div class="bk-opt"><b>Replace</b><span>Makes this device an exact copy of the backup, including roster and settings.' +
+      (lost
+        ? ' <b>' + lost + ' record(s) on this device are not in the backup and will be removed.</b>'
+        : '') +
+      '</span><button class="btn btn-ghost" data-act="restore-apply" data-mode="replace">Replace this device\u2019s data</button></div>' +
+      '<p class="hint">Either way, a safety copy of this device\u2019s current data is kept first: Settings \u2192 Undo last restore.</p>',
+  );
+}
+function writeState(st, replace) {
+  COLLECTIONS.forEach((c) => Store.set(c.store, JSON.stringify(st[c.k] || [])));
+  const sigs = {};
+  COLLECTIONS.forEach((c) => (sigs[c.k] = sigsOf(c, st[c.k] || [])));
+  Store.set('dcas_sigs', JSON.stringify(sigs));
+  Store.set('dcas_tomb', JSON.stringify(st.tombstones || {}));
+  Store.set('dcas_notif', JSON.stringify(st.notifLog || {}));
+  if (replace) {
+    if (st.policy) Store.set('dcas_policy', JSON.stringify(st.policy));
+    else Store.del('dcas_policy');
+    if (st.roster) Store.set('dcas_roster', JSON.stringify(st.roster));
+    else Store.del('dcas_roster');
+  }
+  Store.set('dcas_schema', String(SCHEMA_VERSION));
+  Store.set('dcas_seeded', '1');
+  Store.set('dcas_docs_v', '1');
+}
+function applyRestore(mode) {
+  if (!pendingRestore) return;
+  const snap = {};
+  DATA_KEYS.forEach((k) => {
+    const v = Store.get(k);
+    if (v != null) snap[k] = v;
+  });
+  Store.set('dcas_undo', JSON.stringify({ at: Date.now(), keys: snap }));
+  if (
+    Store.get('dcas_undo') == null &&
+    !confirm('Could not keep a safety copy (storage is full). Restore anyway, without undo?')
+  )
+    return;
+  const replace = mode === 'replace';
+  const st = replace ? pendingRestore.state : merge(localState(), pendingRestore.state);
+  writeState(st, replace);
+  pendingRestore = null;
+  try {
+    sessionStorage.setItem(
+      'dcas_flash',
+      replace ? 'Backup restored (replace)' : 'Backup merged into this device',
+    );
+    sessionStorage.setItem('dcas_view', 'settings');
+  } catch (e) {}
+  location.reload();
+}
+function undoRestore() {
+  let u = null;
+  try {
+    u = JSON.parse(Store.get('dcas_undo') || 'null');
+  } catch (e) {
+    u = null;
+  }
+  if (!u || !confirm('Put back this device\u2019s data from before the last restore?')) return;
+  DATA_KEYS.forEach((k) => (k in u.keys ? Store.set(k, u.keys[k]) : Store.del(k)));
+  Store.del('dcas_undo');
+  try {
+    sessionStorage.setItem('dcas_flash', 'Last restore undone');
+    sessionStorage.setItem('dcas_view', 'settings');
+  } catch (e) {}
+  location.reload();
 }
 
 /* ===== shared ===== */
@@ -4251,6 +4609,10 @@ const ACTIONS = {
   digest: (a) => sendDigest(a.team),
   'notif-enable': () => enableNotifications(),
   'docs-clear-demo': () => clearDemoDocs(),
+  'backup-now': () => backupNow(),
+  'restore-pick': () => pickFile('backup'),
+  'restore-apply': (a) => applyRestore(a.mode),
+  'restore-undo': () => undoRestore(),
   'alerts-check': () => {
     runAlertEngine(true);
     renderDocs();
@@ -4399,6 +4761,13 @@ function toggleTheme() {
 
 go(view);
 handleHash();
+try {
+  const flash = sessionStorage.getItem('dcas_flash');
+  if (flash) {
+    sessionStorage.removeItem('dcas_flash');
+    setTimeout(() => toast(flash), 300);
+  }
+} catch (e) {}
 window.addEventListener('hashchange', handleHash);
 runAlertEngine();
 setInterval(() => runAlertEngine(), 6 * 3600 * 1000);
