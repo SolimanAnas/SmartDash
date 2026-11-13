@@ -1468,7 +1468,7 @@ function saveStfCerts(id, team) {
   toast('Documents saved');
 }
 
-/* --- Paramedic QR Code Profile --- */
+/* --- Medic QR Code Profile --- */
 const verifyBase = () =>
   /^https?:$/.test(location.protocol) ? location.origin + location.pathname : 'smartdash:';
 const verifyUrl = (s) =>
@@ -1617,7 +1617,7 @@ function downloadQrPng(id, team) {
     g.font = '600 24px "IBM Plex Mono", monospace';
     g.fillText('#' + s.id + ' · Team ' + s.team + ' · ' + s.title, W / 2, W + 76);
     g.font = '500 20px "IBM Plex Sans", sans-serif';
-    g.fillText('SmartDash paramedic profile · issued ' + fmtD(nowISO()), W / 2, W + 108);
+    g.fillText('SmartDash medic profile · issued ' + fmtD(nowISO()), W / 2, W + 108);
     c.toBlob((b) => {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(b);

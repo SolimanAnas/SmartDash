@@ -1,6 +1,6 @@
 /*
  * Dependency-free QR Code generator (ISO/IEC 18004, byte mode).
- * Pure module: no DOM, no state. Used for the Paramedic QR Code Profile.
+ * Pure module: no DOM, no state. Used for the Medic QR Code Profile.
  *
  *   qrMatrix(text, ecl?) -> { size, version, dark(x, y) }
  *   qrSvg(text, opts?)   -> '<svg …>' string (one <path>, numbers only — safe for innerHTML)

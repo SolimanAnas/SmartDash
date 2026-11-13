@@ -34,7 +34,7 @@ Definitions live in `proj/src/docs.js` (`DOC_DEFS`); adding a document is one li
 - Missing required documents are listed separately (*Not on file*).
 - Export: *Export alerts* (Excel) and the *Expiry Alerts* sheet in *Export everything*.
 
-## 3. Paramedic QR code profile
+## 3. Medic QR code profile
 
 - Every staff profile has **QR profile**: a QR code plus the same verification card a supervisor sees.
   **Download badge** saves a printable PNG (code, name, staff ID, team, title, issue date).
