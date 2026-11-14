@@ -759,6 +759,7 @@
       <div id="dropReport" class="drop" data-act="pick" data-kind="report"></div>
       <div id="dropAch" class="drop" data-act="pick" data-kind="ach"></div>
       <div id="dropDocs" class="drop" data-act="pick" data-kind="docs"></div>
+      <div id="rosterPeriod" class="card"></div>
       <input type="file" id="fileIn" accept=".xlsx,.xls" style="display: none" />
     </main>
 
@@ -880,7 +881,7 @@
         </div>
       </div>
       <p style="font-size: 11.5px; color: var(--muted); text-align: center; line-height: 1.7">
-        Roster source: Airport schedule &mdash; June 2026 (Teams A&ndash;D). Excel engine:
+        Roster: <span id="rosterSrc"></span> (Teams A&ndash;D). Excel engine:
         <span id="xlsxState" class="mono"></span>
       </p>
     </main>

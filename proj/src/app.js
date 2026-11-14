@@ -1,5 +1,16 @@
 import ROSTER from '../data/roster.json';
-import { esc, deb, dateOf, dispName, initials, telOf, uid, today, fmtD } from './util.js';
+import {
+  esc,
+  deb,
+  dispName,
+  initials,
+  telOf,
+  uid,
+  today,
+  fmtD,
+  monthHint,
+  rosterStartFor,
+} from './util.js';
 import { qrSvg } from './qr.js';
 import {
   DOC_DEFS,
@@ -8,6 +19,7 @@ import {
   isBlocking,
   localISO,
   addDays,
+  daysBetween,
   normDate,
   expiries,
   docState,
@@ -39,8 +51,8 @@ import { reportMonths, monthSummary, delta } from './monthly.js';
 
 /* ===== utilities ===== */
 const $ = (s) => document.querySelector(s);
-const TODAY = Math.min(new Date().getDate(), 30);
-let day = TODAY,
+let TODAY = 1; // roster day index of today's date (clamped into the roster period)
+let day = 1,
   view = sessionStorage.getItem('dcas_view') || 'dashboard',
   cmdShift = new Date().getHours() >= 5 && new Date().getHours() < 16 ? 'D' : 'N';
 let stfFilter = 'all',
@@ -49,7 +61,7 @@ let stfFilter = 'all',
   initFilter = 'all',
   shiftFilter = 'all';
 const CODES = { D: { l: 'Day' }, N: { l: 'Night' }, X: { l: 'Off' }, AL: { l: 'Leave' } };
-const shiftOn = (s, d) => s.shifts[d - 1] || 'X';
+const shiftOn = (s, d) => s.shifts[(typeof d === 'string' ? dayOfISO(d) : d) - 1] || 'X';
 const isDuty = (c) => c === 'D' || c === 'N';
 let STAFF = ROSTER.staff;
 
@@ -164,15 +176,54 @@ const saveNotif = () => Store.set('dcas_notif', JSON.stringify(notifLog));
 
 /* ===== staff documents: lookups, dates, readiness ===== */
 const nowISO = () => localISO();
+/*
+ * Roster period: ROSTER.start (YYYY-MM-DD) + NDAYS() consecutive days; staff.shifts[i] is the
+ * shift on start + i. A period can cross months (e.g. 5 Oct – 15 Nov). Older stored rosters
+ * without `start` fall back to the first day of ROSTER.year / monthIndex.
+ */
 const rosterStart = () =>
+  ROSTER.start ||
   localISO(new Date(ROSTER.year || 2026, ROSTER.monthIndex == null ? 5 : ROSTER.monthIndex, 1));
+const NDAYS = () => ROSTER.days || (STAFF[0] && STAFF[0].shifts.length) || 30;
 const rosterISO = (d) => addDays(rosterStart(), d - 1);
+const rosterDate = (d) => {
+  const p = rosterISO(d).split('-');
+  return new Date(+p[0], +p[1] - 1, +p[2]);
+};
+const dayOfISO = (iso) => daysBetween(rosterStart(), iso) + 1;
+const dayNum = (d) => rosterDate(d).getDate();
 const dayLabel = (d) =>
-  new Date(
-    ROSTER.year || 2026,
-    ROSTER.monthIndex == null ? 5 : ROSTER.monthIndex,
-    d,
-  ).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  rosterDate(d).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+const todayIdx = () => Math.min(NDAYS(), Math.max(1, dayOfISO(localISO())));
+function periodLabel() {
+  const a = rosterDate(1),
+    b = rosterDate(NDAYS());
+  const fullMonth =
+    a.getDate() === 1 &&
+    a.getMonth() === b.getMonth() &&
+    a.getFullYear() === b.getFullYear() &&
+    new Date(b.getFullYear(), b.getMonth(), b.getDate() + 1).getDate() === 1;
+  if (fullMonth) return a.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const f = (d, y) =>
+    d.toLocaleDateString(
+      'en-GB',
+      y ? { day: 'numeric', month: 'short', year: 'numeric' } : { day: 'numeric', month: 'short' },
+    );
+  return f(a, a.getFullYear() !== b.getFullYear()) + ' \u2013 ' + f(b, true);
+}
+/** Calendar months (YYYY-MM) the roster period touches. */
+const rosterMonthKeys = () => {
+  const out = [];
+  for (let d = 1; d <= NDAYS(); d++) {
+    const m = rosterISO(d).slice(0, 7);
+    if (out.indexOf(m) < 0) out.push(m);
+  }
+  return out;
+};
+function resetToday() {
+  TODAY = todayIdx();
+  day = TODAY;
+}
 const findStaff = (id, team) =>
   STAFF.filter((x) => x.id === id && x.team === team)[0] || STAFF.filter((x) => x.id === id)[0];
 const teamSics = (team) =>
@@ -469,7 +520,7 @@ function onFab() {
   )();
 }
 function stepDay(n) {
-  day = Math.min(30, Math.max(1, day + n));
+  day = Math.min(NDAYS(), Math.max(1, day + n));
   refreshDay();
 }
 function setDay(d) {
@@ -596,8 +647,8 @@ function mLabel(m) {
 
 function renderDashboard() {
   renderBackupNudge();
-  $('#dsDate').textContent = 'June ' + day;
-  $('#dsWd').textContent = dateOf(day).toLocaleDateString('en-US', { weekday: 'long' });
+  $('#dsDate').textContent = dayLabel(day);
+  $('#dsWd').textContent = rosterDate(day).toLocaleDateString('en-US', { weekday: 'long' });
   $('#dsToday').classList.toggle('show', day !== TODAY);
   const onDuty = STAFF.filter((s) => isDuty(shiftOn(s, day))).length;
   const dashShift = new Date().getHours() >= 5 && new Date().getHours() < 16 ? 'D' : 'N';
@@ -807,7 +858,7 @@ function renderDashReady(code) {
   const r = shiftReadiness(day, code);
   const band = readinessBand(r.pct);
   let strip = '';
-  for (let d = day; d < Math.min(30, day + 6) + 1; d++)
+  for (let d = day; d < Math.min(NDAYS(), day + 6) + 1; d++)
     strip +=
       '<div class="hm-day' +
       (d === day ? ' sel' : '') +
@@ -890,7 +941,7 @@ function covRow(c, i) {
 /* ===== command center ===== */
 function renderCommand() {
   const shiftLabel = cmdShift === 'D' ? 'Day' : 'Night';
-  $('#cmdDayLbl').textContent = shiftLabel + ' shift \u00b7 June ' + day;
+  $('#cmdDayLbl').textContent = shiftLabel + ' shift \u00b7 ' + dayLabel(day);
   document.querySelectorAll('#cmdShiftSel .shift-btn').forEach((b) => {
     b.classList.toggle('active', b.dataset.shift === cmdShift);
   });
@@ -1037,7 +1088,7 @@ function viewTerminal(ap, term) {
     })
     .join('');
   openSheet(
-    label + ' \u00b7 June ' + day,
+    label + ' \u00b7 ' + dayLabel(day),
     det(
       'Coverage',
       sts.filter((s) => s.crew.some((c) => isDuty(shiftOn(c, day)))).length +
@@ -1070,8 +1121,8 @@ function viewTerminal(ap, term) {
 
 /* ===== roster ===== */
 function renderRoster() {
-  $('#rosMonth').textContent = ROSTER.month;
-  $('#rosDay').textContent = 'June ' + day;
+  $('#rosMonth').textContent = periodLabel();
+  $('#rosDay').textContent = dayLabel(day);
   $('#strips').innerHTML = ROSTER.teams
     .map((t) => {
       let h =
@@ -1080,7 +1131,7 @@ function renderRoster() {
         '">' +
         t +
         '</span></div>';
-      for (let d = 1; d <= 30; d++) {
+      for (let d = 1; d <= NDAYS(); d++) {
         const c = teamCode(t, d);
         h +=
           '<div class="cell c-' +
@@ -1089,7 +1140,7 @@ function renderRoster() {
           '" data-act="setday" data-d="' +
           d +
           '"><span class="cd">' +
-          d +
+          dayNum(d) +
           '</span><span class="cc">' +
           c +
           '</span></div>';
@@ -1266,7 +1317,7 @@ function viewStaff(id, team) {
       ) +
       docs.body +
       det(
-        'Attendance \u2014 June',
+        'Attendance \u2014 ' + periodLabel(),
         '<span style="color:var(--day);font-weight:600">' +
           cnt('D') +
           ' day</span> \u00b7 <span style="color:var(--night);font-weight:600">' +
@@ -1309,19 +1360,19 @@ function viewStaff(id, team) {
               .join('')
           : '<span style="color:var(--muted)">None</span>',
       ) +
-      det('Shift schedule \u2014 June 2026', miniCal(s)),
+      det('Shift schedule \u2014 ' + periodLabel(), miniCal(s)),
   );
 }
 function miniCal(s) {
   let h = '<div class="minical">';
-  for (let d = 1; d <= 30; d++) {
+  for (let d = 1; d <= NDAYS(); d++) {
     const c = shiftOn(s, d);
     h +=
       '<div class="mc c-' +
       c +
-      (d === TODAY ? ' today' : '') +
+      (rosterISO(d) === localISO() ? ' today' : '') +
       '"><div class="d">' +
-      d +
+      dayNum(d) +
       '</div><div class="c">' +
       c +
       '</div></div>';
@@ -3532,8 +3583,8 @@ function viewShiftReady(d, code) {
   openSheet('Shift readiness', shiftReadyHtml(d, code));
 }
 function renderReadiness() {
-  const days = ROSTER.days || 30;
-  $('#rdyMonth').textContent = ROSTER.month;
+  const days = NDAYS();
+  $('#rdyMonth').textContent = periodLabel();
   $('#rdyDemo').innerHTML = demoNote();
   const grid = {},
     all = [];
@@ -3560,14 +3611,11 @@ function renderReadiness() {
     tile(avg == null ? '—' : avg + '%', 'Month average', readinessBand(avg)) +
     tile(
       lo ? lo.r.pct + '%' : '—',
-      lo ? 'Lowest · ' + CODES[lo.c].l + ' ' + lo.d : 'Lowest shift',
+      lo ? 'Lowest · ' + CODES[lo.c].l + ' ' + esc(dayLabel(lo.d)) : 'Lowest shift',
       lo ? readinessBand(lo.r.pct) : 'none',
     ) +
     tile(below + '/' + scored.length, 'Shifts below 95%', below ? 'watch' : 'ok');
-  const offset =
-    (new Date(ROSTER.year || 2026, ROSTER.monthIndex == null ? 5 : ROSTER.monthIndex, 1).getDay() +
-      6) %
-    7;
+  const offset = (rosterDate(1).getDay() + 6) % 7;
   let cal =
     '<div class="hm-cal">' +
     ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -3579,7 +3627,9 @@ function renderReadiness() {
       '<div class="hm-day' +
       (d === day ? ' sel' : '') +
       '"><div class="hm-dn">' +
-      d +
+      (d === 1 || dayNum(d) === 1
+        ? esc(rosterDate(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }))
+        : dayNum(d)) +
       '</div>' +
       hmCell(d, 'D', grid[d].D) +
       hmCell(d, 'N', grid[d].N) +
@@ -3693,6 +3743,7 @@ function savePolicy() {
 const hasXLSX = () => typeof XLSX !== 'undefined';
 function renderSettings() {
   $('#xlsxState').textContent = hasXLSX() ? 'ready' : 'loading\u2026';
+  $('#rosterSrc').textContent = periodLabel();
   renderBackupCard();
   renderPolicy();
 }
@@ -3727,6 +3778,7 @@ function renderUpload() {
     ['var(--gold-soft)', 'var(--gold)'],
     'tpl-ach',
   );
+  renderRosterPeriod();
   $('#dropDocs').innerHTML = card(
     'Upload Staff Documents',
     'Licenses \u00b7 IDs \u00b7 visas \u00b7 refresher courses \u00b7 qualifications',
@@ -3772,7 +3824,7 @@ function handleFile(file, kind) {
     try {
       const wb = XLSX.read(ev.target.result, { type: 'array' });
       if (kind === 'backup') importBackup(wb);
-      else if (kind === 'roster') importRoster(wb);
+      else if (kind === 'roster') importRoster(wb, file.name);
       else if (kind === 'report') importReports(wb);
       else if (kind === 'docs') importDocs(wb);
       else importAchievements(wb);
@@ -3782,7 +3834,7 @@ function handleFile(file, kind) {
   };
   r.readAsArrayBuffer(file);
 }
-function importRoster(wb) {
+function importRoster(wb, fileName) {
   const dotted = wb.SheetNames.filter((n) => /^\..*\.$/.test(n));
   if (!dotted.length) {
     toast('No team sheets (.A.\u2013.D.) found');
@@ -3792,10 +3844,29 @@ function importRoster(wb) {
   const SEC = ['Overtime', 'Swap', 'ANNUAL LEAVES', 'SPECIAL DUTY'];
   const REL = ['RELIEVERS', 'RELIEVERS from Other Areas'];
   const out = [];
+  /* Day columns come from the header row: day-of-month numbers from column J onwards
+     (e.g. 5 … 31, 1 … 15 for a period crossing months), then REMARKS. */
+  const layoutOf = (c) => {
+    const cols = [],
+      nums = [];
+    for (let j = 9; j < c.length; j++) {
+      const n = /^\d{1,2}(\.0+)?$/.test(c[j]) ? parseInt(c[j], 10) : 0;
+      if (n >= 1 && n <= 31) {
+        cols.push(j);
+        nums.push(n);
+      } else if (cols.length) break;
+    }
+    if (!cols.length) for (let j = 9; j < 39; j++) (cols.push(j), nums.push(j - 8));
+    const rk = c.findIndex((x, j) => j > cols[cols.length - 1] && /remark/i.test(x));
+    return { cols, nums, remark: rk > 0 ? rk : cols[cols.length - 1] + 1 };
+  };
+  let refNums = null;
   dotted.forEach((sn) => {
     const team = sn.replace(/\./g, '');
     const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: '' });
-    let airport = 'DXB',
+    let layout = layoutOf([]),
+      lead = 0,
+      airport = 'DXB',
       term = '',
       area = '',
       cs = '',
@@ -3810,6 +3881,10 @@ function importRoster(wb) {
       if (c[2] === 'CALL SIGN') {
         if (AIR[c[0]]) airport = AIR[c[0]];
         supp = false;
+        layout = layoutOf(c);
+        if (!refNums) refNums = layout.nums;
+        // a sheet whose header starts later than the first sheet's is shifted to line up
+        lead = Math.max(0, refNums.indexOf(layout.nums[0]));
         return;
       }
       if (AIR[c[0]]) {
@@ -3833,8 +3908,7 @@ function importRoster(wb) {
       const name = c[5],
         sid = String(c[4]).replace(/\.0$/, '');
       if (!name || !sid) return;
-      let days = c.slice(9, 39).map((x) => x || 'X');
-      while (days.length < 30) days.push('X');
+      const days = new Array(lead).fill('X').concat(layout.cols.map((j) => c[j] || 'X'));
       const no = cs.toUpperCase().indexOf('AIRPORT') === 0 ? cs.replace(/\D/g, '') : '';
       const sup = cs === 'Supervisor';
       out.push({
@@ -3851,7 +3925,7 @@ function importRoster(wb) {
         adp: c[7].toUpperCase() === 'ADP',
         tdp: c[8].toUpperCase() === 'TDP',
         shifts: days,
-        remark: c[39] || '',
+        remark: c[layout.remark] || '',
       });
     });
   });
@@ -3859,6 +3933,13 @@ function importRoster(wb) {
     toast('No staff rows parsed');
     return;
   }
+  const n = Math.max.apply(
+    null,
+    out.map((s) => s.shifts.length),
+  );
+  out.forEach((s) => {
+    while (s.shifts.length < n) s.shifts.push('X');
+  });
   ROSTER.staff = out;
   STAFF = out;
   ROSTER.teams = Object.keys(
@@ -3867,15 +3948,49 @@ function importRoster(wb) {
       return a;
     }, {}),
   ).sort();
-  Store.set('dcas_roster', JSON.stringify({ staff: out, teams: ROSTER.teams }));
+  ROSTER.start = rosterStartFor(refNums || [], monthHint(fileName), localISO());
+  ROSTER.days = n;
+  ROSTER.month = periodLabel();
+  saveRosterMeta();
+  resetToday();
   _expCache = null;
   const demo = removeDemoDocs();
   toast(
     out.length +
-      ' staff loaded from Excel' +
+      ' staff loaded \u00b7 ' +
+      periodLabel() +
       (demo ? ' \u00b7 ' + demo + ' demo document records removed' : ''),
   );
   go('roster');
+}
+function saveRosterMeta() {
+  Store.set(
+    'dcas_roster',
+    JSON.stringify({ staff: STAFF, teams: ROSTER.teams, start: ROSTER.start, days: ROSTER.days }),
+  );
+}
+/* Upload Center: show the loaded roster period and let the start date be corrected. */
+function renderRosterPeriod() {
+  $('#rosterPeriod').innerHTML =
+    '<div class="card-h">Roster period</div><p class="hint" style="margin-top:0">' +
+    esc(periodLabel()) +
+    ' \u00b7 ' +
+    NDAYS() +
+    ' days. Dates come from the schedule header and the file name; correct the first day if needed.</p>' +
+    '<div class="field-row"><div class="field"><label>First day of the roster</label><input id="rosterStartIn" type="date" value="' +
+    esc(rosterStart()) +
+    '"></div></div><button class="btn btn-ghost" data-act="roster-start">Apply</button>';
+}
+function setRosterStart() {
+  const v = $('#rosterStartIn').value;
+  if (!v) return;
+  ROSTER.start = v;
+  ROSTER.days = NDAYS();
+  ROSTER.month = periodLabel();
+  saveRosterMeta();
+  resetToday();
+  renderRosterPeriod();
+  toast('Roster period: ' + periodLabel());
 }
 function importReports(wb) {
   const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
@@ -3951,7 +4066,7 @@ function tplReport() {
   writeBook('monthly-report-template.xlsx', {
     'Monthly Report': [
       ['Month', 'Cases', 'Avg Response (min)', 'ROSC', 'Refusals', 'Transfers'],
-      ['2026-06', 0, 0, 0, 0, 0],
+      [today().slice(0, 7), 0, 0, 0, 0, 0],
     ],
   });
 }
@@ -4011,7 +4126,7 @@ function alertRows() {
 }
 function readinessRows() {
   const out = [];
-  for (let d = 1; d <= (ROSTER.days || 30); d++)
+  for (let d = 1; d <= NDAYS(); d++)
     ['D', 'N'].forEach((c) => {
       const r = shiftReadiness(d, c);
       out.push({
@@ -4253,10 +4368,6 @@ function clearAll() {
 
 /* ===== monthly report (printable / Save as PDF) ===== */
 let mrMonth = null;
-const rosterMonthKey = () =>
-  (ROSTER.year || 2026) +
-  '-' +
-  String((ROSTER.monthIndex == null ? 5 : ROSTER.monthIndex) + 1).padStart(2, '0');
 const KPI_L = {
   cases: 'Cases',
   resp: 'Avg response (min)',
@@ -4298,17 +4409,17 @@ const mrMore = (n, shown) =>
   n > shown ? '<p class="mr-none">+ ' + (n - shown) + ' more in the app</p>' : '';
 const pct1 = (a, b) => (b ? Math.round((a / b) * 100) : 0);
 
-function rosterMonthStats() {
-  const days = ROSTER.days || 30,
-    shifts = [];
-  for (let d = 1; d <= days; d++)
-    ['D', 'N'].forEach((code) => {
-      const cov = terminalCoverage(d, code);
-      const st = cov.reduce((n, c) => n + c.stations, 0),
-        cv = cov.reduce((n, c) => n + c.covered, 0);
-      const r = shiftReadiness(d, code);
-      shifts.push({ d, code, gaps: st - cv, cov: pct1(cv, st), ready: r.pct, crew: r.crew });
-    });
+function rosterMonthStats(m) {
+  const shifts = [];
+  for (let d = 1; d <= NDAYS(); d++)
+    if (rosterISO(d).slice(0, 7) === m)
+      ['D', 'N'].forEach((code) => {
+        const cov = terminalCoverage(d, code);
+        const st = cov.reduce((n, c) => n + c.stations, 0),
+          cv = cov.reduce((n, c) => n + c.covered, 0);
+        const r = shiftReadiness(d, code);
+        shifts.push({ d, code, gaps: st - cv, cov: pct1(cv, st), ready: r.pct, crew: r.crew });
+      });
   const scored = shifts.filter((x) => x.ready != null);
   return {
     shifts: shifts.length,
@@ -4383,8 +4494,8 @@ function monthlyHtml(m) {
   );
 
   // 3. Coverage & readiness (roster month only)
-  if (m === rosterMonthKey()) {
-    const r = rosterMonthStats();
+  if (rosterMonthKeys().indexOf(m) >= 0) {
+    const r = rosterMonthStats(m);
     h += mrSec(
       'Coverage & shift readiness',
       mrStats([
@@ -4403,7 +4514,7 @@ function monthlyHtml(m) {
   } else
     h += mrSec(
       'Coverage & shift readiness',
-      mrNone('Available for the loaded roster month (' + mLabel(rosterMonthKey()) + ') only.'),
+      mrNone('Available only for months covered by the loaded roster (' + periodLabel() + ').'),
     );
 
   // 4. Medic documents (point in time)
@@ -4499,9 +4610,10 @@ function monthlyHtml(m) {
   return h;
 }
 function renderMonthly() {
-  const months = reportMonths({ reports, shiftReports, challenges, achievements }, [
-    rosterMonthKey(),
-  ]);
+  const months = reportMonths(
+    { reports, shiftReports, challenges, achievements },
+    rosterMonthKeys(),
+  );
   const cur = nowISO().slice(0, 7);
   if (!mrMonth || months.indexOf(mrMonth) < 0)
     mrMonth = months.filter((x) => x <= cur)[0] || months[0];
@@ -4924,6 +5036,7 @@ const ACTIONS = {
     toast('Readiness policy reset');
   },
   'tpl-docs': () => tplDocs(),
+  'roster-start': () => setRosterStart(),
   'shift-new': () => editShift(null),
   'shift-view': (a) => viewShift(a.id),
   'shift-edit': (a) => editShift(a.id),
@@ -4979,9 +5092,12 @@ try {
       ROSTER.staff = o.staff;
       STAFF = o.staff;
       if (o.teams) ROSTER.teams = o.teams;
+      if (o.start) ROSTER.start = o.start;
+      ROSTER.days = o.days || o.staff[0].shifts.length;
     }
   }
 } catch (e) {}
+resetToday();
 
 /* first run: demo data. Existing installs get the document set once, unless real records exist. */
 if (!Store.get('dcas_seeded')) seedSample(false);
