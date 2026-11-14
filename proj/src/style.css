@@ -2717,3 +2717,85 @@ html[data-theme='dark'] .theme-toggle .ic-sun {
   margin-left: auto;
   margin-right: 8px;
 }
+
+/* ===== backup & restore ===== */
+.bk-nudge,
+.bk-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  font-size: 12.5px;
+}
+.bk-nudge > div,
+.bk-status {
+  flex-direction: column;
+  align-items: flex-start;
+}
+.bk-nudge > div {
+  display: flex;
+  gap: 2px;
+}
+.bk-nudge {
+  flex-direction: row;
+}
+.bk-ok {
+  background: var(--green-soft);
+  color: var(--green);
+}
+.bk-warn {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+.bk-bad {
+  background: var(--red-soft);
+  color: var(--red-d);
+}
+.bk-status {
+  gap: 2px;
+}
+.bk-table-wrap {
+  overflow-x: auto;
+  margin-bottom: 12px;
+}
+.bk-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.bk-table th,
+.bk-table td {
+  padding: 6px 4px;
+  text-align: right;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.bk-table th:first-child,
+.bk-table td:first-child {
+  text-align: left;
+}
+.bk-table th {
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: normal;
+}
+.bk-opt {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+.bk-opt span {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}

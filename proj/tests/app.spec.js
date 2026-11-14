@@ -95,7 +95,7 @@ test('staff documents editor opens and saves', async ({ page }) => {
   await page.locator('[data-act="stf-cert"]').click();
   const sheet = page.locator('#sheet');
   await expect(sheet.locator('#sheetTitle')).toContainText(/Certifications & documents/);
-  await expect(sheet.locator('#cert-dha')).toBeVisible();
+  await expect(sheet.locator('#cert-bls')).toBeVisible();
   await expect(sheet.locator('#cert-visa-na')).toBeAttached();
   await sheet.locator('[data-act="qual-add"]').click();
   await sheet.locator('#qualRows .qual-row').last().locator('.q-title').fill('MSc Emergency Care');
@@ -125,7 +125,7 @@ test('scanned QR link opens the verification card', async ({ page }) => {
     title: 'EMT',
     name: 'Staff 010',
     asOf: '2026-11-01',
-    exps: { dha: '2099-01-01', bls: '2000-01-01' },
+    exps: { airport: '2099-01-01', bls: '2000-01-01' },
   });
   await page.evaluate(() => localStorage.setItem('dcas_cert', '[]'));
   await page.goto('/?scan=1#verify=' + payload);
@@ -146,7 +146,7 @@ test('scanned QR link is checked against the live record when present', async ({
     title: 'EMT',
     name: 'Staff 010',
     asOf: '2026-11-01',
-    exps: { dha: '2099-01-01' },
+    exps: { airport: '2099-01-01' },
   });
   await page.goto('/?scan=2#verify=' + payload);
   const sheet = page.locator('#sheet');
@@ -226,7 +226,8 @@ test('settings page loads with export and roadmap', async ({ page }) => {
   await page.locator('.nav button[data-v="more"]').click();
   await page.locator('[data-act="go"][data-v="settings"]').click();
   await expect(page.locator('text=Export everything')).toBeVisible();
-  await expect(page.locator('#policyList [data-pol="dha"]')).toBeChecked();
+  await expect(page.locator('#policyList [data-pol="airport"]')).toBeChecked();
+  await expect(page.locator('#policyList [data-pol="dha"]')).toHaveCount(0);
   await expect(page.locator('text=Digital transformation roadmap')).toBeVisible();
   await expect(page.locator('text=Clear all records')).toBeVisible();
 });

@@ -65,10 +65,10 @@ test('readiness: blocking documents expired or missing make a medic not ready', 
   expect(ok.ready).toBe(true);
 
   const c = allValid();
-  c.dha = '2026-06-10';
+  c.airport = '2026-06-10';
   const lapsed = assess(EMT, expiries(c), '2026-06-15');
   expect(lapsed.ready).toBe(false);
-  expect(lapsed.blockers.map((b) => b.def.k)).toEqual(['dha']);
+  expect(lapsed.blockers.map((b) => b.def.k)).toEqual(['airport']);
   // forward-looking: still ready on a shift before the expiry date
   expect(assess(EMT, expiries(c), '2026-06-09').ready).toBe(true);
 
@@ -139,10 +139,10 @@ test('QR payload never carries personal documents', () => {
       title: 'EMT',
       name: 'Staff 002',
       asOf: '2026-11-13',
-      exps: { dha: '2027-01-01', eid: '2027-02-02', passport: '2030-03-03', visa: 'na' },
+      exps: { airport: '2027-01-01', eid: '2027-02-02', passport: '2030-03-03', visa: 'na' },
     }),
   );
-  expect(back.exps).toEqual({ dha: '2027-01-01' });
+  expect(back.exps).toEqual({ airport: '2027-01-01' });
 });
 
 test('sample documents are deterministic per staff member', () => {
