@@ -35,6 +35,7 @@ import {
   sheetsToWorkbook,
   workbookToSheets,
 } from './backup.js';
+import { reportMonths, monthSummary, delta } from './monthly.js';
 
 /* ===== utilities ===== */
 const $ = (s) => document.querySelector(s);
@@ -427,6 +428,7 @@ function go(v) {
     shift: 'more',
     docs: 'more',
     readiness: 'more',
+    monthly: 'more',
   };
   document
     .querySelectorAll('.nav button')
@@ -444,6 +446,7 @@ function go(v) {
     staff: renderStaff,
     reports: renderReports,
     analytics: renderAnalytics,
+    monthly: renderMonthly,
     achievements: renderAch,
     initiatives: renderInit,
     upload: renderUpload,
@@ -4248,6 +4251,285 @@ function clearAll() {
   toast('All records cleared');
 }
 
+/* ===== monthly report (printable / Save as PDF) ===== */
+let mrMonth = null;
+const rosterMonthKey = () =>
+  (ROSTER.year || 2026) +
+  '-' +
+  String((ROSTER.monthIndex == null ? 5 : ROSTER.monthIndex) + 1).padStart(2, '0');
+const KPI_L = {
+  cases: 'Cases',
+  resp: 'Avg response (min)',
+  rosc: 'ROSC',
+  refusals: 'Refusals',
+  transfers: 'Transfers',
+};
+const mrSec = (title, body) =>
+  '<section class="mr-sec"><h3>' + esc(title) + '</h3>' + body + '</section>';
+const mrNone = (t) => '<p class="mr-none">' + esc(t) + '</p>';
+const mrStats = (items) =>
+  '<div class="mr-stats">' +
+  items
+    .map(
+      (x) =>
+        '<div class="mr-stat"><b>' +
+        x[0] +
+        '</b><span>' +
+        esc(x[1]) +
+        '</span>' +
+        (x[2]
+          ? '<i class="' +
+            (x[3] === true ? 'up' : x[3] === false ? 'down' : '') +
+            '">' +
+            esc(x[2]) +
+            '</i>'
+          : '') +
+        '</div>',
+    )
+    .join('') +
+  '</div>';
+const mrTable = (head, rows) =>
+  '<table class="mr-tbl"><thead><tr>' +
+  head.map((h) => '<th>' + esc(h) + '</th>').join('') +
+  '</tr></thead><tbody>' +
+  rows.map((r) => '<tr>' + r.map((c) => '<td>' + esc(c) + '</td>').join('') + '</tr>').join('') +
+  '</tbody></table>';
+const mrMore = (n, shown) =>
+  n > shown ? '<p class="mr-none">+ ' + (n - shown) + ' more in the app</p>' : '';
+const pct1 = (a, b) => (b ? Math.round((a / b) * 100) : 0);
+
+function rosterMonthStats() {
+  const days = ROSTER.days || 30,
+    shifts = [];
+  for (let d = 1; d <= days; d++)
+    ['D', 'N'].forEach((code) => {
+      const cov = terminalCoverage(d, code);
+      const st = cov.reduce((n, c) => n + c.stations, 0),
+        cv = cov.reduce((n, c) => n + c.covered, 0);
+      const r = shiftReadiness(d, code);
+      shifts.push({ d, code, gaps: st - cv, cov: pct1(cv, st), ready: r.pct, crew: r.crew });
+    });
+  const scored = shifts.filter((x) => x.ready != null);
+  return {
+    shifts: shifts.length,
+    avgCov: Math.round(shifts.reduce((n, x) => n + x.cov, 0) / (shifts.length || 1)),
+    withGaps: shifts.filter((x) => x.gaps > 0),
+    avgReady: scored.length
+      ? Math.round(scored.reduce((n, x) => n + x.ready, 0) / scored.length)
+      : null,
+    lowReady: scored
+      .slice()
+      .sort((a, b) => a.ready - b.ready || a.d - b.d)
+      .slice(0, 3),
+  };
+}
+const shiftName = (x) => dayLabel(x.d) + ' ' + (x.code === 'D' ? 'Day' : 'Night');
+
+function monthlyHtml(m) {
+  const s = monthSummary({ reports, shiftReports, challenges, initiatives, achievements }, m);
+  const today = nowISO();
+  let h =
+    '<header class="mr-head"><div><div class="mr-org">Dubai Corporation for Ambulance Services \u00b7 Airport Section</div><h2>Monthly Operations Report</h2><div class="mr-month">' +
+    esc(mLabel(m)) +
+    '</div></div><div class="mr-meta">DXB &amp; DWC<br>Prepared ' +
+    fmtD(today) +
+    '</div></header>';
+
+  // 1. KPIs
+  h += mrSec(
+    'Key performance indicators',
+    s.hasKpi
+      ? mrStats(
+          s.kpis.map((k) => {
+            const dl = delta(k.k, k.v, k.prev);
+            return [String(k.v), KPI_L[k.k], dl.t, dl.good];
+          }),
+        ) + (s.hasPrev ? '' : mrNone('No report for the previous month to compare with.'))
+      : mrNone('No monthly KPI report entered for this month (More \u2192 Monthly Reports).'),
+  );
+
+  // 2. Shift reports
+  const sh = s.shifts;
+  const issueRows = (list) =>
+    list.slice(0, 8).map((x) => [fmtD(x.date), x.shift, x.team ? 'Team ' + x.team : '', x.t]);
+  h += mrSec(
+    'Shift reports',
+    sh.reported
+      ? mrStats([
+          [sh.reported + '/' + sh.expected, 'Shifts reported'],
+          [String(sh.cases), 'Cases handled'],
+          [String(sh.transfers), 'Transfers'],
+          [String(sh.refusals), 'Refusals'],
+          [String(sh.rosc), 'ROSC'],
+        ]) +
+          [
+            ['Staffing shortages', sh.shortages],
+            ['Equipment issues', sh.equipment],
+            ['Pending incidents', sh.incidents],
+          ]
+            .filter((x) => x[1].length)
+            .map(
+              (x) =>
+                '<h4>' +
+                esc(x[0]) +
+                ' (' +
+                x[1].length +
+                ')</h4>' +
+                mrTable(['Date', 'Shift', 'Team', 'Details'], issueRows(x[1])) +
+                mrMore(x[1].length, 8),
+            )
+            .join('')
+      : mrNone('No end-of-shift reports were logged for this month.'),
+  );
+
+  // 3. Coverage & readiness (roster month only)
+  if (m === rosterMonthKey()) {
+    const r = rosterMonthStats();
+    h += mrSec(
+      'Coverage & shift readiness',
+      mrStats([
+        [r.avgCov + '%', 'Average station coverage'],
+        [String(r.withGaps.length), 'Shifts with uncovered stations'],
+        [r.avgReady == null ? '\u2013' : r.avgReady + '%', 'Average crew readiness'],
+      ]) +
+        (r.lowReady.length
+          ? '<h4>Lowest readiness</h4>' +
+            mrTable(
+              ['Shift', 'Ready', 'Crew'],
+              r.lowReady.map((x) => [shiftName(x), x.ready + '%', String(x.crew)]),
+            )
+          : ''),
+    );
+  } else
+    h += mrSec(
+      'Coverage & shift readiness',
+      mrNone('Available for the loaded roster month (' + mLabel(rosterMonthKey()) + ') only.'),
+    );
+
+  // 4. Medic documents (point in time)
+  const al = currentAlerts(today);
+  const cnt = (t) => al.filter((a) => a.tier === t).length;
+  const readyNow = STAFF.filter((x) => staffAssess(x, today).ready).length;
+  const urgent = al.filter((a) => a.tier === 'expired' || a.tier === 15 || a.tier === 30);
+  h += mrSec(
+    'Medic documents (as of ' + fmtD(today) + ')',
+    mrStats([
+      [pct1(readyNow, STAFF.length) + '%', 'Staff ready for duty'],
+      [String(cnt('expired')), 'Expired'],
+      [String(cnt(15) + cnt(30)), 'Due within 30 days'],
+      [String(cnt(60)), 'Due in 31\u201360 days'],
+      [String(cnt('missing')), 'Not on file'],
+    ]) +
+      (urgent.length
+        ? '<h4>Expired or due within 30 days</h4>' +
+          mrTable(
+            ['Medic', 'Team', 'Document', 'Expiry'],
+            urgent
+              .slice(0, 15)
+              .map((a) => [
+                dispName(a.s.name) + ' #' + a.s.id,
+                a.s.team,
+                a.def.l,
+                fmtD(a.exp) + (a.days < 0 ? ' (expired)' : ' (' + a.days + 'd)'),
+              ]),
+          ) +
+          mrMore(urgent.length, 15)
+        : '') +
+      (certifications.some((r) => r.sample)
+        ? mrNone('Includes demo document records \u2014 not real data.')
+        : ''),
+  );
+
+  // 5. Challenges
+  const c = s.challenges;
+  h += mrSec(
+    'Challenges',
+    mrStats([
+      [String(c.opened), 'Raised this month'],
+      [String(c.openedResolved), 'Of those, resolved'],
+      [String(c.openNow), 'Open now (all months)'],
+      [String(c.urgent.length), 'Open high / critical'],
+    ]) +
+      (c.urgent.length
+        ? '<h4>Open high / critical</h4>' +
+          mrTable(
+            ['Priority', 'Raised', 'Location', 'Issue', 'Owner'],
+            c.urgent
+              .slice(0, 10)
+              .map((x) => [
+                x.priority,
+                fmtD(x.date),
+                x.location || '',
+                x.description || '',
+                x.owner || '',
+              ]),
+          ) +
+          mrMore(c.urgent.length, 10)
+        : ''),
+  );
+
+  // 6. Initiatives & achievements
+  const ini = s.initiatives;
+  h += mrSec(
+    'Initiatives & achievements',
+    mrStats([
+      [String(ini.completed.length), 'Initiatives completed'],
+      [String(ini.inProgress), 'In progress'],
+      [String(ini.proposed), 'Proposed'],
+      [String(s.achievements.length), 'Staff achievements'],
+    ]) +
+      (ini.completed.length
+        ? '<h4>Completed</h4>' +
+          mrTable(
+            ['Initiative', 'Owner', 'Impact'],
+            ini.completed.map((i) => [i.title || '', i.owner || '', i.impact || '']),
+          )
+        : '') +
+      (s.achievements.length
+        ? '<h4>Achievements</h4>' +
+          mrTable(
+            ['Date', 'Staff', 'Achievement'],
+            s.achievements.map((a) => [fmtD(a.date), dispName(a.staffName || ''), a.title || '']),
+          )
+        : ''),
+  );
+
+  h +=
+    '<footer class="mr-foot">Generated by SmartDash from records on this device \u00b7 Internal \u2014 contains staff information</footer>';
+  return h;
+}
+function renderMonthly() {
+  const months = reportMonths({ reports, shiftReports, challenges, achievements }, [
+    rosterMonthKey(),
+  ]);
+  const cur = nowISO().slice(0, 7);
+  if (!mrMonth || months.indexOf(mrMonth) < 0)
+    mrMonth = months.filter((x) => x <= cur)[0] || months[0];
+  $('#mrChips').innerHTML = months
+    .map(
+      (x) =>
+        '<button class="chip ' +
+        (x === mrMonth ? 'active' : '') +
+        '" data-act="mr-month" data-key="' +
+        esc(x) +
+        '">' +
+        esc(mLabel(x)) +
+        '</button>',
+    )
+    .join('');
+  $('#mrDoc').innerHTML = monthlyHtml(mrMonth);
+}
+function printMonthly() {
+  const prev = document.title;
+  document.title = 'SmartDash monthly report ' + mrMonth; // default PDF file name
+  const done = () => {
+    document.title = prev;
+    window.removeEventListener('afterprint', done);
+  };
+  window.addEventListener('afterprint', done);
+  window.print();
+}
+
 /* ===== backup & restore ===== */
 const DATA_KEYS = COLLECTIONS.map((c) => c.store).concat([
   'dcas_notif',
@@ -4620,6 +4902,11 @@ const ACTIONS = {
   'notif-enable': () => enableNotifications(),
   'docs-clear-demo': () => clearDemoDocs(),
   'backup-now': () => backupNow(),
+  'mr-month': (a) => {
+    mrMonth = a.key;
+    renderMonthly();
+  },
+  'mr-print': () => printMonthly(),
   'restore-pick': () => pickFile('backup'),
   'restore-apply': (a) => applyRestore(a.mode),
   'restore-undo': () => undoRestore(),
