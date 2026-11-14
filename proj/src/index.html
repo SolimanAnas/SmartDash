@@ -437,6 +437,24 @@
         </div>
         <span class="chev">&rsaquo;</span>
       </button>
+      <button class="menu-item" data-act="go" data-v="monthly">
+        <div class="mi-ic" style="background: var(--green-soft); color: var(--green)">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          >
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <path d="M14 2v6h6M8 13h8M8 17h5" />
+          </svg>
+        </div>
+        <div>
+          <div class="mi-t">Monthly Report (PDF)</div>
+          <div class="mi-d">One-page summary for the head of division</div>
+        </div>
+      </button>
       <button class="menu-item" data-act="go" data-v="analytics">
         <div class="mi-ic" style="background: var(--red-soft); color: var(--red-d)">
           <svg
@@ -655,6 +673,24 @@
         ><button class="btn btn-primary" data-act="rep-new">Add manually</button>
       </div>
       <div id="repList"></div>
+    </main>
+
+    <main id="view-monthly" class="view">
+      <button class="back" data-act="go" data-v="more">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M15 18l-6-6 6-6" /></svg
+        >More
+      </button>
+      <div class="sec-h mr-tools"><h2>Monthly Report</h2></div>
+      <div class="chips mr-tools" id="mrChips"></div>
+      <button class="btn btn-primary mr-tools mr-print" data-act="mr-print">
+        Print / Save as PDF
+      </button>
+      <p class="hint mr-tools">
+        In the print dialog choose <b>Save as PDF</b>. The report contains staff information: share
+        it only through DCAS channels.
+      </p>
+      <article class="mr-doc" id="mrDoc"></article>
     </main>
 
     <main id="view-analytics" class="view">

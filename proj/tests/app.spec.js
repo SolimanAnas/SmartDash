@@ -238,3 +238,22 @@ test('install banner element exists in DOM', async ({ page }) => {
   await expect(banner.locator('#installBtn')).toBeVisible();
   await expect(banner.locator('#installDismiss')).toBeVisible();
 });
+
+test('monthly report renders, switches month and prints', async ({ page }) => {
+  await page.locator('.nav button[data-v="more"]').click();
+  await page.locator('#view-more [data-act="go"][data-v="monthly"]').click();
+  await expect(page.locator('#view-monthly')).toHaveClass(/active/);
+  await expect(page.locator('#mrDoc .mr-month')).toHaveText('June 2026');
+  await expect(page.locator('#mrDoc')).toContainText('Coverage & shift readiness');
+  await expect(page.locator('#mrDoc')).toContainText('Shifts reported');
+  await page.locator('#mrChips [data-key="2026-05"]').click();
+  await expect(page.locator('#mrDoc .mr-month')).toHaveText('May 2026');
+  await expect(page.locator('#mrDoc')).toContainText('Avg response (min)');
+  await expect(page.locator('#mrDoc')).toContainText('vs prev.');
+  await page.evaluate(() => {
+    window.__printed = 0;
+    window.print = () => window.__printed++;
+  });
+  await page.locator('[data-act="mr-print"]').click();
+  expect(await page.evaluate(() => window.__printed)).toBe(1);
+});
