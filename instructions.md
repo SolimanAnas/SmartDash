@@ -85,7 +85,7 @@ Add a module: create `src/<name>.js`, `import` it from `app.js`; esbuild bundles
 ## 5. Architecture
 
 ### State (in `app.js` closure)
-Mutable module-scoped vars (not global): `day` (1–30, `TODAY` = today's day of month), `view`, `stfFilter`, `chFilter`, `achFilter`, `initFilter`, `docsFilter`, `STAFF`, `ROSTER`, the record arrays `challenges`, `reports`, `achievements`, `initiatives`, `certifications`, `shiftReports`, plus `notifLog` (raised expiry alerts) and `policy` (document keys that count toward readiness).
+Mutable module-scoped vars (not global): `day` (roster day index 1…`NDAYS()`, `TODAY` = index of today's date, clamped into the roster period), `view`, `stfFilter`, `chFilter`, `achFilter`, `initFilter`, `docsFilter`, `STAFF`, `ROSTER`, the record arrays `challenges`, `reports`, `achievements`, `initiatives`, `certifications`, `shiftReports`, plus `notifLog` (raised expiry alerts) and `policy` (document keys that count toward readiness).
 
 ### Navigation
 `go(view)` toggles `.view` panels and the bottom-nav active state, then calls that view's render fn.
@@ -113,6 +113,7 @@ Keys: `dcas_ch`, `dcas_rep`, `dcas_ach`, `dcas_init`, `dcas_cert` (staff documen
 - `TERMS` — the four terminal groups (T1/T2/T3 DXB, DWC).
 - `terminalCoverage(day)` — per terminal: stations, covered, gaps, headcount, status (`ok`/`short`/`crit`). Drives Dashboard + Command Center.
 - `teamCode(team, day)` — modal shift code for a team on a day (roster strip).
+- **Roster period**: a roster is `ROSTER.start` (YYYY-MM-DD) + `NDAYS()` consecutive days, not a calendar month — DCAS schedules run e.g. 5 Oct – 15 Nov. `staff.shifts[i]` is the shift on `start + i`. Use `rosterISO(day)`, `rosterDate(day)`, `dayLabel(day)`, `dayNum(day)`, `periodLabel()`, `dayOfISO(iso)` and `rosterMonthKeys()`; never hard-code a month or 30 days. `shiftOn(staff, day)` also accepts an ISO date.
 - `shiftOn(staff, day)`, `isDuty(code)`.
 - `rosterISO(day)` — roster day → calendar date (from `ROSTER.year` / `monthIndex`).
 - `expsOf(staff)` — expiry map for a staff member (cached; `saveCert()` invalidates).
@@ -127,7 +128,7 @@ Keys: `dcas_ch`, `dcas_rep`, `dcas_ach`, `dcas_init`, `dcas_cert` (staff documen
 
 ### Excel I/O
 `hasXLSX()` guards all Excel use. `handleFile(file, kind)` → `importRoster|importReports|importAchievements`. `writeBook(name, sheets)` writes `.xlsx`; `tplReport()/tplAch()` emit templates; `exportAllExcel()` writes a multi-sheet workbook.
-**Roster parser** reads only dotted sheets `.A.`–`.D.`; columns `[Terminal, Area, Call Sign, Title, Staff ID, Name, Phone, ADP, TDP, day1..day30, Remarks]`; skips `RELIEVERS/Overtime/Swap/ANNUAL LEAVES/SPECIAL DUTY`; switches airport on `Dubai International Airport` / `Al-Maktoum Airport` rows.
+**Roster parser** reads only dotted sheets `.A.`–`.D.`; columns `[Terminal, Area, Call Sign, Title, Staff ID, Name, Phone, ADP, TDP, <day columns>, Remarks]` — the day columns are read from the `CALL SIGN` header row (day-of-month numbers from column J until `REMARKS`, any length, may wrap 31 → 1). The start date comes from those numbers plus the month/year in the file name (`monthHint`, `rosterStartFor` in `util.js`), else the period nearest today; Upload Center → Roster period lets a supervisor correct the first day; skips `RELIEVERS/Overtime/Swap/ANNUAL LEAVES/SPECIAL DUTY`; switches airport on `Dubai International Airport` / `Al-Maktoum Airport` rows.
 
 ---
 
